@@ -10,48 +10,34 @@ pip install -e .
 
 ## Quick start
 
-```bash
-flashkit info application.swf          # file summary
-flashkit classes application.swf       # list all classes
-flashkit class application.swf Player  # inspect a class
-flashkit strings application.swf -s config  # search strings
-```
-
 ```python
 from flashkit.workspace import Workspace
 
 ws = Workspace()
 ws.load_swf("application.swf")
-for cls in ws.classes:
-    print(cls.qualified_name, cls.super_name)
+
+# Find all classes extending Sprite
+for cls in ws.find_classes(extends="Sprite"):
+    print(f"{cls.qualified_name} — {len(cls.fields)} fields, {len(cls.methods)} methods")
+
+# Inspect a specific class
+player = ws.get_class("PlayerManager")
+print(player.super_name)    # "EventDispatcher"
+print(player.interfaces)    # ["IDisposable", "ITickable"]
+print(player.fields[0].name, player.fields[0].type_name)  # "mHealth", "Number"
+
+# Search strings used in bytecode
+from flashkit.analysis import StringIndex
+strings = StringIndex.from_workspace(ws)
+for s in strings.search("config"):
+    print(s)
 ```
 
 ---
 
-## CLI reference
+## CLI
 
-```
-flashkit <command> <file> [options]
-```
-
-| Command | Description |
-|---------|-------------|
-| `info` | File summary (format, version, class/method/string counts) |
-| `tags` | List all SWF tags with types and sizes |
-| `classes` | List classes with optional filters |
-| `class` | Inspect a single class (fields, methods, inheritance) |
-| `strings` | List or search string constants |
-| `disasm` | Disassemble AVM2 bytecode |
-| `callers` | Find callers of a method or property |
-| `callees` | Find outgoing calls from a method |
-| `refs` | Find cross-references to a name |
-| `tree` | Show inheritance tree (descendants or ancestors) |
-| `packages` | List packages and class counts |
-| `extract` | Extract raw ABC blocks to files |
-| `build` | Rebuild SWF (recompress or decompress) |
-
-<details>
-<summary><strong>flashkit info</strong> — file summary</summary>
+### `flashkit info`
 
 ```
 $ flashkit info application.swf
@@ -66,42 +52,18 @@ File: application.swf
   Packages:   47
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit tags</strong> — list SWF tags</summary>
-
-```
-$ flashkit tags application.swf
-#      Type     Name                                      Size
---------------------------------------------------------------
-0      69       FileAttributes                               4
-1      9        SetBackgroundColor                           3
-2      82       DoABC2                                 1847293
-3      76       SymbolClass                                 14
-4      0        End                                          0
-
-5 tags total
-```
-
-</details>
-
-<details>
-<summary><strong>flashkit classes</strong> — list classes</summary>
+### `flashkit classes`
 
 ```bash
-flashkit classes application.swf                    # all classes
-flashkit classes application.swf -p com.game        # filter by package
-flashkit classes application.swf -e Sprite          # filter by superclass
-flashkit classes application.swf -s Manager         # search by name
-flashkit classes application.swf -i                 # interfaces only
-flashkit classes application.swf -v                 # verbose output
+flashkit classes app.swf                # all classes
+flashkit classes app.swf -s Manager     # search by name
+flashkit classes app.swf -p com.game    # filter by package
+flashkit classes app.swf -e Sprite      # filter by superclass
+flashkit classes app.swf -i             # interfaces only
+flashkit classes app.swf -v             # verbose output
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit class</strong> — inspect a single class</summary>
+### `flashkit class`
 
 ```
 $ flashkit class application.swf PlayerManager
@@ -123,75 +85,61 @@ PlayerManager
     serialize(): ByteArray
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit strings</strong> — search string constants</summary>
+### `flashkit strings`
 
 ```bash
-flashkit strings application.swf                       # list all
-flashkit strings application.swf -s config             # substring search
-flashkit strings application.swf -s "http" -v          # with usage locations
-flashkit strings application.swf -s "\\d+" -r          # regex search
-flashkit strings application.swf -c                    # classify (URLs, debug markers)
+flashkit strings app.swf                # list all
+flashkit strings app.swf -s config      # search
+flashkit strings app.swf -s config -v   # with usage locations
+flashkit strings app.swf -s "\\d+" -r   # regex
+flashkit strings app.swf -c             # classify (URLs, debug)
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit disasm</strong> — disassemble bytecode</summary>
+### `flashkit tags`
 
 ```bash
-flashkit disasm application.swf --class PlayerManager
-flashkit disasm application.swf --method-index 42
+flashkit tags app.swf
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit callers / callees</strong> — call graph queries</summary>
+### `flashkit disasm`
 
 ```bash
-flashkit callers application.swf toString
-flashkit callees application.swf PlayerManager.init
+flashkit disasm app.swf --class PlayerManager
+flashkit disasm app.swf --method-index 42
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit refs</strong> — cross-references</summary>
+### `flashkit tree`
 
 ```bash
-flashkit refs application.swf Point
+flashkit tree app.swf BaseEntity              # show descendants
+flashkit tree app.swf PlayerManager -a        # show ancestors
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit tree</strong> — inheritance tree</summary>
+### `flashkit callers` / `flashkit callees`
 
 ```bash
-flashkit tree application.swf BaseEntity              # descendants
-flashkit tree application.swf PlayerManager -a        # ancestors
+flashkit callers app.swf toString
+flashkit callees app.swf PlayerManager.init
 ```
 
-</details>
-
-<details>
-<summary><strong>flashkit packages / extract / build</strong></summary>
+### `flashkit refs`
 
 ```bash
-flashkit packages application.swf                     # list packages
-flashkit extract application.swf -o ./output          # extract ABC blocks
-flashkit build application.swf -o rebuilt.swf         # rebuild (compressed)
-flashkit build application.swf -o out.swf -d          # rebuild (decompressed)
+flashkit refs app.swf Point
 ```
 
-</details>
+### `flashkit packages` / `flashkit extract` / `flashkit build`
+
+```bash
+flashkit packages app.swf                     # list packages
+flashkit extract app.swf -o ./output          # extract ABC blocks
+flashkit build app.swf -o rebuilt.swf         # rebuild (compressed)
+flashkit build app.swf -o out.swf -d          # rebuild (decompressed)
+```
 
 ---
 
-## Library reference
+## Library
 
 ### Load and query
 
@@ -211,6 +159,26 @@ print(cls.methods)  # list of MethodInfoResolved
 
 ws.find_classes(extends="Sprite")
 ws.find_classes(package="com.example", is_interface=True)
+```
+
+### Analysis
+
+```python
+from flashkit.analysis import InheritanceGraph, CallGraph, StringIndex
+
+graph = InheritanceGraph.from_classes(ws.classes)
+graph.get_children("BaseEntity")
+graph.get_all_parents("MyClass")
+graph.get_implementors("ISerializable")
+
+calls = CallGraph.from_workspace(ws)
+calls.get_callers("toString")
+calls.get_callees("MyClass.init")
+
+strings = StringIndex.from_workspace(ws)
+strings.search("config")
+strings.url_strings()
+strings.classes_using_string("http://example.com")
 ```
 
 <details>
@@ -250,29 +218,6 @@ abc_bytes = serialize_abc(b.build())
 swf = SwfBuilder(version=40, width=800, height=600, fps=30)
 swf.add_abc("GameCode", abc_bytes)
 swf_bytes = swf.build(compress=True)
-```
-
-</details>
-
-<details>
-<summary><strong>Analysis (inheritance, call graph, strings)</strong></summary>
-
-```python
-from flashkit.analysis import InheritanceGraph, CallGraph, StringIndex
-
-graph = InheritanceGraph.from_classes(ws.classes)
-graph.get_children("BaseEntity")
-graph.get_all_parents("MyClass")
-graph.get_implementors("ISerializable")
-
-calls = CallGraph.from_workspace(ws)
-calls.get_callers("toString")
-calls.get_callees("MyClass.init")
-
-strings = StringIndex.from_workspace(ws)
-strings.search("config")
-strings.url_strings()
-strings.classes_using_string("http://example.com")
 ```
 
 </details>
