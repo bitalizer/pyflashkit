@@ -169,24 +169,32 @@ ws.find_classes(extends="Sprite")
 ws.find_classes(package="com.example", is_interface=True)
 ```
 
-### Analysis
+### Search and analysis
 
 ```python
-from flashkit.analysis import InheritanceGraph, CallGraph, StringIndex
+from flashkit.search import SearchEngine
 
-graph = InheritanceGraph.from_classes(ws.classes)
-graph.get_children("BaseEntity")
-graph.get_all_parents("MyClass")
-graph.get_implementors("ISerializable")
+engine = SearchEngine(ws)
 
-calls = CallGraph.from_workspace(ws)
-calls.get_callers("toString")
-calls.get_callees("MyClass.init")
+# Inheritance
+engine.find_subclasses("BaseEntity", transitive=True)
+engine.find_implementors("ISerializable")
 
-strings = StringIndex.from_workspace(ws)
-strings.search("config")
-strings.url_strings()
-strings.classes_using_string("http://example.com")
+# Call graph
+engine.find_callers("toString")
+engine.find_callees("PlayerManager.init")
+
+# References
+engine.find_instantiators("Point")
+engine.find_type_users("ByteArray")
+
+# Strings
+engine.find_by_string("config")
+engine.find_classes_by_string("http://example.com")
+
+# Structural
+engine.find_classes_with_field_type("ByteArray")
+engine.find_methods(return_type="String", name="get")
 ```
 
 <details>
