@@ -25,7 +25,7 @@ from .constants import *
 log = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True)
 class Instruction:
     """A single decoded AVM2 instruction.
 
@@ -273,6 +273,116 @@ def _build_lookup() -> dict[int, tuple[str, str]]:
     return lookup
 
 _LOOKUP = _build_lookup()
+
+
+# ── Fast operand-format table for the lightweight scanner ──────────────────
+# Maps every known opcode to an integer encoding its operand format:
+#   0 = none, 1 = u8, 2 = u30, 3 = u30u30, 4 = s24, 5 = lookupswitch, 6 = debug
+_FMT_CODE = {"": 0, "u8": 1, "u30": 2, "u30u30": 3, "s24": 4, "u30u8": 3}
+
+def _build_skip_table() -> list[int]:
+    """Build a 256-entry table: opcode → operand format code.
+
+    Unknown opcodes get format code 0xFF (sentinel for "stop scanning").
+    """
+    tbl = [0xFF] * 256
+    for op, (_, fmt) in _LOOKUP.items():
+        if fmt == "special":
+            # OP_lookupswitch=5, OP_debug=6
+            tbl[op] = 5 if op == OP_lookupswitch else 6
+        else:
+            tbl[op] = _FMT_CODE.get(fmt, 0)
+    return tbl
+
+_SKIP_TABLE = _build_skip_table()
+
+
+def _skip_u30(data: bytes, off: int) -> int:
+    """Advance past a u30 without decoding its value."""
+    for _ in range(5):
+        if (data[off] & 0x80) == 0:
+            return off + 1
+        off += 1
+    return off
+
+
+def scan_relevant_opcodes(
+    code: bytes,
+    opcodes: frozenset[int],
+) -> list[tuple[int, int, int]]:
+    """Lightweight bytecode scanner that only decodes opcodes of interest.
+
+    Walks the bytecode stream, skipping operands for irrelevant opcodes
+    via a precomputed table lookup. For opcodes in *opcodes*, decodes
+    the first u30 operand and records the hit.
+
+    This avoids creating Instruction objects, mnemonic strings, and
+    operand lists for the vast majority of instructions.
+
+    Args:
+        code: Raw bytecode bytes (from MethodBodyInfo.code).
+        opcodes: Set of opcode values to capture.
+
+    Returns:
+        List of ``(offset, opcode, first_operand)`` tuples for matched
+        instructions. The first operand is always the first u30 in the
+        instruction's operand stream (valid for u30 and u30u30 formats).
+    """
+    results: list[tuple[int, int, int]] = []
+    off = 0
+    code_len = len(code)
+    skip_table = _SKIP_TABLE
+
+    while off < code_len:
+        start = off
+        op = code[off]
+        off += 1
+        fmt = skip_table[op]
+
+        if op in opcodes:
+            # All relevant opcodes have u30 or u30u30 format — decode first u30
+            try:
+                val, off = read_u30(code, off)
+            except (IndexError, ValueError):
+                break
+            results.append((start, op, val))
+            # If u30u30, skip the second u30
+            if fmt == 3:
+                try:
+                    off = _skip_u30(code, off)
+                except IndexError:
+                    break
+            continue
+
+        # Skip operands for irrelevant opcodes
+        try:
+            if fmt == 0:       # no operands
+                pass
+            elif fmt == 1:     # u8
+                off += 1
+            elif fmt == 2:     # u30
+                off = _skip_u30(code, off)
+            elif fmt == 3:     # u30u30
+                off = _skip_u30(code, off)
+                off = _skip_u30(code, off)
+            elif fmt == 4:     # s24
+                off += 3
+            elif fmt == 5:     # lookupswitch
+                off += 3  # default s24
+                case_count, off = read_u30(code, off)
+                off += (case_count + 1) * 3  # case s24s
+            elif fmt == 6:     # debug
+                off += 1  # debug_type u8
+                off = _skip_u30(code, off)  # index u30
+                off += 1  # reg u8
+                off = _skip_u30(code, off)  # extra u30
+            else:
+                # Unknown opcode — can't determine size, bail out
+                break
+        except (IndexError, ValueError):
+            break
+
+    return results
 
 
 def decode_instructions(code: bytes,

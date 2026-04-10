@@ -25,13 +25,21 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 
 from ..abc.types import AbcFile
-from ..abc.disasm import decode_instructions
+from ..abc.disasm import scan_relevant_opcodes
 from ..abc.constants import OP_getproperty, OP_setproperty, OP_initproperty
+
+_FIELD_SCAN_OPS = frozenset({OP_getproperty, OP_setproperty, OP_initproperty})
+
+_FIELD_ACCESS_TYPE = {
+    OP_getproperty: "read",
+    OP_setproperty: "write",
+    OP_initproperty: "init",
+}
 from ..info.member_info import resolve_multiname
 from ..info.class_info import ClassInfo
 
 
-@dataclass
+@dataclass(slots=True)
 class FieldAccess:
     """A single field read or write in bytecode.
 
@@ -51,7 +59,7 @@ class FieldAccess:
     offset: int
 
 
-@dataclass
+@dataclass(slots=True)
 class FieldAccessIndex:
     """Index of field accesses across all method bodies.
 
@@ -124,38 +132,28 @@ class FieldAccessIndex:
         method_owner_map = _build_method_owner_map(abc, classes)
         method_name_map = _build_method_name_map(abc, classes)
 
-        access_ops = {
-            OP_getproperty: "read",
-            OP_setproperty: "write",
-            OP_initproperty: "init",
-        }
-
         for body in abc.method_bodies:
             owner_class = method_owner_map.get(body.method, "")
             method_name = method_name_map.get(
                 body.method, f"method_{body.method}")
 
             try:
-                instructions = decode_instructions(body.code)
+                hits = scan_relevant_opcodes(body.code, _FIELD_SCAN_OPS)
             except Exception:
                 continue
 
-            for instr in instructions:
-                if instr.opcode in access_ops:
-                    if not instr.operands:
-                        continue
-                    mn_index = instr.operands[0]
-                    target = resolve_multiname(abc, mn_index)
-                    if target == "*" or target.startswith("multiname["):
-                        continue
-                    self._add(FieldAccess(
-                        class_name=owner_class,
-                        method_name=method_name,
-                        method_index=body.method,
-                        field_name=target,
-                        access_type=access_ops[instr.opcode],
-                        offset=instr.offset,
-                    ))
+            for offset, op, operand in hits:
+                target = resolve_multiname(abc, operand)
+                if target == "*" or target.startswith("multiname["):
+                    continue
+                self._add(FieldAccess(
+                    class_name=owner_class,
+                    method_name=method_name,
+                    method_index=body.method,
+                    field_name=target,
+                    access_type=_FIELD_ACCESS_TYPE[op],
+                    offset=offset,
+                ))
 
     # ── Per-field queries ──────────────────────────────────────────────
 

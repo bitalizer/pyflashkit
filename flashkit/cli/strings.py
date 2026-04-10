@@ -23,11 +23,8 @@ def register(sub: argparse._SubParsersAction) -> None:
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
 
-    from ..analysis.strings import StringIndex
-    idx = StringIndex.from_workspace(ws)
-
     if args.search:
-        matches = idx.search(args.search, regex=args.regex)
+        matches = ws.search_strings(args.search, regex=args.regex)
         if not matches:
             print("No matching strings.")
             return
@@ -35,14 +32,15 @@ def run(args: argparse.Namespace) -> None:
         for s in matches:
             print(f"  {green(repr(s))}")
             if args.verbose:
-                for u in idx.by_string.get(s, []):
-                    print(f"    used in {dim(u.class_name)}.{u.method_name}")
+                classes = ws.classes_using_string(s)
+                for cls_name in classes:
+                    print(f"    used in {dim(cls_name)}")
         print(f"\n{len(matches)} unique string(s)")
     else:
-        all_strings = sorted(idx.pool_strings)
+        all_strings = sorted(ws.all_strings)
         if args.classify:
-            urls = idx.url_strings()
-            files = idx.debug_markers()
+            urls = ws.url_strings()
+            files = ws.debug_markers()
             print(bold("URLs:"))
             for s in urls:
                 print(f"  {s}")

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 
 from ..abc.types import AbcFile
-from ..abc.disasm import decode_instructions
+from ..abc.disasm import scan_relevant_opcodes
 from ..abc.constants import (
     OP_callproperty, OP_callpropvoid, OP_constructprop,
     OP_getproperty, OP_setproperty, OP_initproperty,
@@ -42,13 +42,26 @@ PROPERTY_WRITE_OPS = {OP_setproperty, OP_initproperty}
 CLASS_OPS = {OP_newclass}
 
 # All opcodes that reference a multiname in their first operand
-_MULTINAME_OPS = (
+_MULTINAME_OPS = frozenset(
     CALL_OPS | CONSTRUCT_OPS | PROPERTY_READ_OPS
     | PROPERTY_WRITE_OPS | CLASS_OPS
 )
 
+# Opcode → mnemonic for CallEdge (avoids importing the full lookup table)
+_OP_MNEMONIC = {
+    OP_callproperty: "callproperty",
+    OP_callpropvoid: "callpropvoid",
+    OP_constructprop: "constructprop",
+    OP_getproperty: "getproperty",
+    OP_setproperty: "setproperty",
+    OP_initproperty: "initproperty",
+    OP_getlex: "getlex",
+    OP_findpropstrict: "findpropstrict",
+    OP_newclass: "newclass",
+}
 
-@dataclass
+
+@dataclass(slots=True)
 class CallEdge:
     """A single call/reference edge in the graph.
 
@@ -86,7 +99,7 @@ def _classify_op(opcode: int) -> str:
     return "unknown"
 
 
-@dataclass
+@dataclass(slots=True)
 class CallGraph:
     """Graph of method call and reference edges extracted from bytecode.
 
@@ -123,36 +136,33 @@ class CallGraph:
 
         for abc in ws.abc_blocks:
             method_name_map = _build_method_name_map(abc, ws.classes)
-            method_body_map = build_method_body_map(abc)
 
             for body in abc.method_bodies:
                 caller_name = method_name_map.get(
                     body.method, f"method_{body.method}")
 
                 try:
-                    instructions = decode_instructions(body.code)
+                    hits = scan_relevant_opcodes(body.code, _MULTINAME_OPS)
                 except Exception:
                     continue
 
-                for instr in instructions:
-                    if instr.opcode in _MULTINAME_OPS and instr.operands:
-                        mn_index = instr.operands[0]
-                        target = resolve_multiname(abc, mn_index)
-                        if target == "*" or target.startswith("multiname["):
-                            continue
+                for offset, op, operand in hits:
+                    target = resolve_multiname(abc, operand)
+                    if target == "*" or target.startswith("multiname["):
+                        continue
 
-                        edge = CallEdge(
-                            caller=caller_name,
-                            caller_method_index=body.method,
-                            target=target,
-                            opcode=instr.opcode,
-                            mnemonic=instr.mnemonic,
-                            offset=instr.offset,
-                            edge_type=_classify_op(instr.opcode),
-                        )
-                        graph.edges.append(edge)
-                        graph.callers_index[target].append(edge)
-                        graph.callees_index[caller_name].append(edge)
+                    edge = CallEdge(
+                        caller=caller_name,
+                        caller_method_index=body.method,
+                        target=target,
+                        opcode=op,
+                        mnemonic=_OP_MNEMONIC.get(op, f"op_0x{op:02x}"),
+                        offset=offset,
+                        edge_type=_classify_op(op),
+                    )
+                    graph.edges.append(edge)
+                    graph.callers_index[target].append(edge)
+                    graph.callees_index[caller_name].append(edge)
 
         return graph
 
@@ -176,29 +186,27 @@ class CallGraph:
                 body.method, f"method_{body.method}")
 
             try:
-                instructions = decode_instructions(body.code)
+                hits = scan_relevant_opcodes(body.code, _MULTINAME_OPS)
             except Exception:
                 continue
 
-            for instr in instructions:
-                if instr.opcode in _MULTINAME_OPS and instr.operands:
-                    mn_index = instr.operands[0]
-                    target = resolve_multiname(abc, mn_index)
-                    if target == "*" or target.startswith("multiname["):
-                        continue
+            for offset, op, operand in hits:
+                target = resolve_multiname(abc, operand)
+                if target == "*" or target.startswith("multiname["):
+                    continue
 
-                    edge = CallEdge(
-                        caller=caller_name,
-                        caller_method_index=body.method,
-                        target=target,
-                        opcode=instr.opcode,
-                        mnemonic=instr.mnemonic,
-                        offset=instr.offset,
-                        edge_type=_classify_op(instr.opcode),
-                    )
-                    graph.edges.append(edge)
-                    graph.callers_index[target].append(edge)
-                    graph.callees_index[caller_name].append(edge)
+                edge = CallEdge(
+                    caller=caller_name,
+                    caller_method_index=body.method,
+                    target=target,
+                    opcode=op,
+                    mnemonic=_OP_MNEMONIC.get(op, f"op_0x{op:02x}"),
+                    offset=offset,
+                    edge_type=_classify_op(op),
+                )
+                graph.edges.append(edge)
+                graph.callers_index[target].append(edge)
+                graph.callees_index[caller_name].append(edge)
 
         return graph
 

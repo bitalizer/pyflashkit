@@ -23,22 +23,19 @@ def register(sub: argparse._SubParsersAction) -> None:
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
 
-    from ..analysis.field_access import FieldAccessIndex
-    idx = FieldAccessIndex.from_workspace(ws)
-
     if args.constructor:
-        _show_constructor(idx, args.name)
+        _show_constructor(ws, args.name)
     elif args.field:
-        _show_field(idx, args.name, args.field)
+        _show_field(ws, args.name, args.field)
     elif args.method:
-        _show_method(idx, args.name, args.method)
+        _show_method(ws, args.name, args.method)
     else:
-        _show_summary(idx, args.name)
+        _show_summary(ws, args.name)
 
 
-def _show_constructor(idx, class_name: str) -> None:
-    assignments = idx.constructor_assignments(class_name)
-    reads = idx.constructor_reads(class_name)
+def _show_constructor(ws, class_name: str) -> None:
+    assignments = ws.constructor_assignments(class_name)
+    reads = ws.constructor_reads(class_name)
     if not assignments and not reads:
         print(f"No constructor field accesses found for '{class_name}'.")
         return
@@ -53,10 +50,10 @@ def _show_constructor(idx, class_name: str) -> None:
             print(f"    {f}")
 
 
-def _show_field(idx, class_name: str, field_name: str) -> None:
-    readers = idx.readers_of(class_name, field_name)
-    writers = idx.writers_of(class_name, field_name)
-    count = idx.access_count(class_name, field_name)
+def _show_field(ws, class_name: str, field_name: str) -> None:
+    readers = ws.field_readers(class_name, field_name)
+    writers = ws.field_writers(class_name, field_name)
+    count = ws.field_access_count(class_name, field_name)
     if not readers and not writers:
         print(f"No accesses found for '{class_name}.{field_name}'.")
         return
@@ -72,9 +69,9 @@ def _show_field(idx, class_name: str, field_name: str) -> None:
             print(f"    {m}")
 
 
-def _show_method(idx, class_name: str, method_name: str) -> None:
-    read = idx.fields_read_by(class_name, method_name)
-    written = idx.fields_written_by(class_name, method_name)
+def _show_method(ws, class_name: str, method_name: str) -> None:
+    read = ws.fields_read_by(class_name, method_name)
+    written = ws.fields_written_by(class_name, method_name)
     if not read and not written:
         print(f"No field accesses found in '{class_name}.{method_name}'.")
         return
@@ -89,8 +86,8 @@ def _show_method(idx, class_name: str, method_name: str) -> None:
             print(f"    {f}")
 
 
-def _show_summary(idx, class_name: str) -> None:
-    summary = idx.field_access_summary(class_name)
+def _show_summary(ws, class_name: str) -> None:
+    summary = ws.field_access_summary(class_name)
     if not summary:
         print(f"No field accesses found for '{class_name}'.")
         return

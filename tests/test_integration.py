@@ -12,7 +12,6 @@ from flashkit.swf.builder import SwfBuilder
 from flashkit.swf.parser import parse_swf
 from flashkit.info.class_info import build_all_classes
 from flashkit.workspace import Workspace
-from flashkit.search import SearchEngine
 from flashkit.analysis.inheritance import InheritanceGraph
 from flashkit.analysis.call_graph import CallGraph
 from flashkit.analysis.strings import StringIndex
@@ -229,29 +228,28 @@ class TestFullPipeline:
         trace_callers = graph.get_callers("trace")
         assert len(trace_callers) >= 1
 
-    def test_search_engine(self, game_workspace):
-        engine = SearchEngine(game_workspace)
+    def test_workspace_queries(self, game_workspace):
+        ws = game_workspace
 
         # Find by class name
-        results = engine.find_classes(name="Player")
+        results = ws.find_classes(name="Player")
         assert len(results) >= 1
 
         # Find subclasses of Entity
-        subs = engine.find_subclasses("com.game.Entity")
-        sub_names = {r.name for r in subs}
-        assert "com.game.Player" in sub_names
-        assert "com.game.Enemy" in sub_names
+        subs = ws.get_subclasses("com.game.Entity")
+        assert "com.game.Player" in subs
+        assert "com.game.Enemy" in subs
 
         # Find fields of type int
-        fields = engine.find_fields(type_name="int")
+        fields = ws.find_fields(type_name="int")
         assert len(fields) >= 2  # hp, score at minimum
 
         # Find methods by name
-        methods = engine.find_methods(name="attack")
+        methods = ws.find_methods(name="attack")
         assert len(methods) >= 1
 
         # Find string usage
-        strings = engine.find_by_string("Score")
+        strings = ws.search_strings("Score")
         assert len(strings) >= 1
 
     def test_disasm(self, game_workspace):

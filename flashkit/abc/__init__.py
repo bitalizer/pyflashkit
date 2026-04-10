@@ -41,7 +41,7 @@ from .parser import (
     read_d64,
 )
 from .writer import serialize_abc
-from .disasm import Instruction, decode_instructions
+from .disasm import Instruction, decode_instructions, scan_relevant_opcodes
 from .builder import AbcBuilder
 
 __all__ = [
@@ -74,6 +74,7 @@ __all__ = [
     # Disassembler
     "Instruction",
     "decode_instructions",
+    "scan_relevant_opcodes",
     # Builder
     "AbcBuilder",
 ]

@@ -18,6 +18,7 @@ from .call_graph import CallGraph, CallEdge
 from .references import ReferenceIndex, Reference
 from .strings import StringIndex, StringUsage
 from .field_access import FieldAccessIndex, FieldAccess
+from .unified import build_all_indexes
 
 __all__ = [
     "InheritanceGraph",
@@ -29,4 +30,5 @@ __all__ = [
     "StringUsage",
     "FieldAccessIndex",
     "FieldAccess",
+    "build_all_indexes",
 ]

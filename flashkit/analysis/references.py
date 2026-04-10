@@ -23,16 +23,29 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 
 from ..abc.types import AbcFile
-from ..abc.disasm import decode_instructions
+from ..abc.disasm import scan_relevant_opcodes
 from ..abc.constants import (
     OP_pushstring, OP_constructprop, OP_callproperty, OP_callpropvoid,
     OP_getlex, OP_coerce, OP_newclass,
 )
 from ..info.member_info import resolve_multiname, build_method_body_map
+
+_REF_SCAN_OPS = frozenset({
+    OP_constructprop, OP_callproperty, OP_callpropvoid,
+    OP_getlex, OP_coerce, OP_pushstring,
+})
+
+_REF_KIND_MAP = {
+    OP_constructprop: "instantiation",
+    OP_callproperty: "call",
+    OP_callpropvoid: "call",
+    OP_getlex: "class_ref",
+    OP_coerce: "coerce",
+}
 from ..info.class_info import ClassInfo
 
 
-@dataclass
+@dataclass(slots=True)
 class Reference:
     """A single cross-reference entry.
 
@@ -54,7 +67,7 @@ class Reference:
     offset: int = -1
 
 
-@dataclass
+@dataclass(slots=True)
 class ReferenceIndex:
     """Cross-reference index over all classes and method bodies.
 
@@ -182,94 +195,42 @@ class ReferenceIndex:
     def _index_method_bodies(self, abc: AbcFile,
                              classes: list[ClassInfo]) -> None:
         """Index references from method body opcodes."""
-        method_name_map = _build_method_owner_map(abc, classes)
+        method_owner_map = _build_method_owner_map(abc, classes)
+        method_name_map = _build_method_name_map(abc, classes)
+        string_pool = abc.string_pool
+        string_pool_len = len(string_pool)
 
         for body in abc.method_bodies:
-            owner_class = method_name_map.get(body.method, "")
-            method_name = f"method_{body.method}"
-
-            # Find the method name from classes
-            for ci in classes:
-                for m in ci.all_methods:
-                    if m.method_index == body.method:
-                        method_name = m.name
-                        if not owner_class:
-                            owner_class = ci.qualified_name
-                        break
-                if ci.constructor_index == body.method:
-                    method_name = "<init>"
-                    if not owner_class:
-                        owner_class = ci.qualified_name
+            owner_class = method_owner_map.get(body.method, "")
+            method_name = method_name_map.get(
+                body.method, f"method_{body.method}")
 
             try:
-                instructions = decode_instructions(body.code)
+                hits = scan_relevant_opcodes(body.code, _REF_SCAN_OPS)
             except Exception:
                 continue
 
-            for instr in instructions:
-                if not instr.operands:
-                    continue
-
-                mn_index = instr.operands[0]
-
-                if instr.opcode == OP_constructprop:
-                    target = resolve_multiname(abc, mn_index)
-                    if target != "*" and not target.startswith("multiname["):
+            for offset, op, operand in hits:
+                if op == OP_pushstring:
+                    if 0 < operand < string_pool_len:
                         self._add(Reference(
                             source_class=owner_class,
                             source_member=method_name,
-                            target=target,
-                            ref_kind="instantiation",
-                            method_index=body.method,
-                            offset=instr.offset,
-                        ))
-
-                elif instr.opcode in (OP_callproperty, OP_callpropvoid):
-                    target = resolve_multiname(abc, mn_index)
-                    if target != "*" and not target.startswith("multiname["):
-                        self._add(Reference(
-                            source_class=owner_class,
-                            source_member=method_name,
-                            target=target,
-                            ref_kind="call",
-                            method_index=body.method,
-                            offset=instr.offset,
-                        ))
-
-                elif instr.opcode == OP_getlex:
-                    target = resolve_multiname(abc, mn_index)
-                    if target != "*" and not target.startswith("multiname["):
-                        self._add(Reference(
-                            source_class=owner_class,
-                            source_member=method_name,
-                            target=target,
-                            ref_kind="class_ref",
-                            method_index=body.method,
-                            offset=instr.offset,
-                        ))
-
-                elif instr.opcode == OP_coerce:
-                    target = resolve_multiname(abc, mn_index)
-                    if target != "*" and not target.startswith("multiname["):
-                        self._add(Reference(
-                            source_class=owner_class,
-                            source_member=method_name,
-                            target=target,
-                            ref_kind="coerce",
-                            method_index=body.method,
-                            offset=instr.offset,
-                        ))
-
-                elif instr.opcode == OP_pushstring:
-                    str_index = instr.operands[0]
-                    if 0 < str_index < len(abc.string_pool):
-                        self._add(Reference(
-                            source_class=owner_class,
-                            source_member=method_name,
-                            target=abc.string_pool[str_index],
+                            target=string_pool[operand],
                             ref_kind="string_use",
                             method_index=body.method,
-                            offset=instr.offset,
+                            offset=offset,
+                        ))
+                elif op in _REF_KIND_MAP:
+                    target = resolve_multiname(abc, operand)
+                    if target != "*" and not target.startswith("multiname["):
+                        self._add(Reference(
+                            source_class=owner_class,
+                            source_member=method_name,
+                            target=target,
+                            ref_kind=_REF_KIND_MAP[op],
+                            method_index=body.method,
+                            offset=offset,
                         ))
 
     def field_type_users(self, type_name: str) -> list[Reference]:
@@ -369,3 +330,15 @@ def _build_method_owner_map(abc: AbcFile,
         for m in ci.all_methods:
             owner[m.method_index] = ci.qualified_name
     return owner
+
+
+def _build_method_name_map(abc: AbcFile,
+                           classes: list[ClassInfo]) -> dict[int, str]:
+    """Map method_index → readable method name."""
+    name_map: dict[int, str] = {}
+    for ci in classes:
+        name_map[ci.constructor_index] = "<init>"
+        name_map[ci.static_init_index] = "<cinit>"
+        for m in ci.all_methods:
+            name_map[m.method_index] = m.name
+    return name_map

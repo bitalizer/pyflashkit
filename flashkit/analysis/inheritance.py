@@ -27,7 +27,7 @@ from collections import defaultdict
 from ..info.class_info import ClassInfo
 
 
-@dataclass
+@dataclass(slots=True)
 class InheritanceGraph:
     """Directed graph of class inheritance and interface relationships.
 

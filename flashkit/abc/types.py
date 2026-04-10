@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class NamespaceInfo:
     """A namespace entry in the constant pool.
 
@@ -28,7 +28,7 @@ class NamespaceInfo:
     name: int
 
 
-@dataclass
+@dataclass(slots=True)
 class NsSetInfo:
     """A namespace set — an unordered collection of namespaces.
 
@@ -40,7 +40,7 @@ class NsSetInfo:
     namespaces: list[int]
 
 
-@dataclass
+@dataclass(slots=True)
 class MultinameInfo:
     """A multiname entry in the constant pool.
 
@@ -71,7 +71,7 @@ class MultinameInfo:
     ns_set: int = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class MethodInfo:
     """A method signature (not the body — see MethodBodyInfo).
 
@@ -93,7 +93,7 @@ class MethodInfo:
     param_names: list[int] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class MetadataInfo:
     """Metadata attached to traits (e.g. [SWF(width=800)]).
 
@@ -105,7 +105,7 @@ class MetadataInfo:
     items: list[tuple]
 
 
-@dataclass
+@dataclass(slots=True)
 class TraitInfo:
     """A trait (field, method, getter, setter, class, or const) on a class or script.
 
@@ -127,7 +127,7 @@ class TraitInfo:
     data: bytes
 
 
-@dataclass
+@dataclass(slots=True)
 class InstanceInfo:
     """An instance (non-static side) of a class definition.
 
@@ -152,7 +152,7 @@ class InstanceInfo:
     traits: list[TraitInfo] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ClassInfo:
     """The static side of a class definition.
 
@@ -166,7 +166,7 @@ class ClassInfo:
     traits: list[TraitInfo] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ScriptInfo:
     """A script entry point.
 
@@ -180,7 +180,7 @@ class ScriptInfo:
     traits: list[TraitInfo] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ExceptionInfo:
     """An exception handler within a method body.
 
@@ -198,7 +198,7 @@ class ExceptionInfo:
     var_name: int
 
 
-@dataclass
+@dataclass(slots=True)
 class MethodBodyInfo:
     """The bytecode body of a method.
 
@@ -222,7 +222,7 @@ class MethodBodyInfo:
     traits: list[TraitInfo] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class AbcFile:
     """A complete ABC (ActionScript Byte Code) file.
 

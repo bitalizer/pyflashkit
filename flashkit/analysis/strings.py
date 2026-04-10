@@ -24,13 +24,15 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 
 from ..abc.types import AbcFile
-from ..abc.disasm import decode_instructions
+from ..abc.disasm import scan_relevant_opcodes
 from ..abc.constants import OP_pushstring, OP_debugfile
 from ..info.member_info import resolve_multiname, build_method_body_map
+
+_STRING_SCAN_OPS = frozenset({OP_pushstring, OP_debugfile})
 from ..info.class_info import ClassInfo
 
 
-@dataclass
+@dataclass(slots=True)
 class StringUsage:
     """A single occurrence of a string constant in bytecode.
 
@@ -50,7 +52,7 @@ class StringUsage:
     opcode: int = OP_pushstring
 
 
-@dataclass
+@dataclass(slots=True)
 class StringIndex:
     """Index of string constant usage across all method bodies.
 
@@ -128,6 +130,8 @@ class StringIndex:
         """Walk all method bodies in an AbcFile and index string usages."""
         method_owner_map = _build_method_owner_map(abc, classes)
         method_name_map = _build_method_name_map(abc, classes)
+        string_pool = abc.string_pool
+        string_pool_len = len(string_pool)
 
         for body in abc.method_bodies:
             owner_class = method_owner_map.get(body.method, "")
@@ -135,25 +139,20 @@ class StringIndex:
                 body.method, f"method_{body.method}")
 
             try:
-                instructions = decode_instructions(body.code)
+                hits = scan_relevant_opcodes(body.code, _STRING_SCAN_OPS)
             except Exception:
                 continue
 
-            for instr in instructions:
-                if instr.opcode in (OP_pushstring, OP_debugfile):
-                    if not instr.operands:
-                        continue
-                    str_index = instr.operands[0]
-                    if 0 < str_index < len(abc.string_pool):
-                        string_val = abc.string_pool[str_index]
-                        self._add(StringUsage(
-                            string=string_val,
-                            class_name=owner_class,
-                            method_name=method_name,
-                            method_index=body.method,
-                            offset=instr.offset,
-                            opcode=instr.opcode,
-                        ))
+            for offset, op, operand in hits:
+                if 0 < operand < string_pool_len:
+                    self._add(StringUsage(
+                        string=string_pool[operand],
+                        class_name=owner_class,
+                        method_name=method_name,
+                        method_index=body.method,
+                        offset=offset,
+                        opcode=op,
+                    ))
 
     def search(self, pattern: str, regex: bool = False) -> list[str]:
         """Search for strings matching a pattern.

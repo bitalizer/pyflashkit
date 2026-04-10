@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from .class_info import ClassInfo
 
 
-@dataclass
+@dataclass(slots=True)
 class PackageInfo:
     """A package containing one or more classes.
 

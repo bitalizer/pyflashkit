@@ -10,6 +10,7 @@ field/method lists.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from ..abc.types import AbcFile
 from ..abc.constants import INSTANCE_Interface
@@ -19,8 +20,11 @@ from .member_info import (
     build_method_body_map,
 )
 
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
 
-@dataclass
+
+@dataclass(slots=True)
 class ClassInfo:
     """A fully resolved class definition.
 
@@ -68,6 +72,7 @@ class ClassInfo:
     multiname_index: int = 0
     super_multiname_index: int = 0
     interface_multiname_indices: list[int] = field(default_factory=list)
+    _workspace: Workspace | None = field(default=None, repr=False, compare=False)
 
     @property
     def all_fields(self) -> list[FieldInfo]:
@@ -98,6 +103,84 @@ class ClassInfo:
             if m.name == name:
                 return m
         return None
+
+    def _require_workspace(self) -> Workspace:
+        """Get the workspace or raise an error."""
+        if self._workspace is None:
+            raise RuntimeError(
+                "This ClassInfo is not attached to a Workspace. "
+                "Load the SWF via Workspace.load_swf() to use "
+                "analysis properties.")
+        return self._workspace
+
+    @property
+    def strings(self) -> list[str]:
+        """All string constants referenced by this class.
+
+        Returns:
+            Sorted list of unique string values.
+        """
+        ws = self._require_workspace()
+        return ws.strings_in_class(self.qualified_name)
+
+    @property
+    def references_to(self) -> list:
+        """All incoming references to this class.
+
+        Returns:
+            List of Reference objects pointing to this class.
+        """
+        ws = self._require_workspace()
+        return ws.references_to(self.name)
+
+    @property
+    def references_from(self) -> list:
+        """All outgoing references from this class.
+
+        Returns:
+            List of Reference objects originating from this class.
+        """
+        ws = self._require_workspace()
+        return ws.references_from(self.qualified_name)
+
+    @property
+    def subclasses(self) -> list[str]:
+        """Direct subclasses of this class.
+
+        Returns:
+            List of subclass qualified names.
+        """
+        ws = self._require_workspace()
+        return ws.get_subclasses(self.qualified_name)
+
+    @property
+    def ancestors(self) -> list[str]:
+        """Full ancestor chain (parent → root).
+
+        Returns:
+            List of ancestor qualified names.
+        """
+        ws = self._require_workspace()
+        return ws.get_ancestors(self.qualified_name)
+
+    @property
+    def field_access_summary(self) -> dict[str, dict]:
+        """Summary of all field accesses in this class.
+
+        Returns:
+            Dict of field_name → {readers: [...], writers: [...]}.
+        """
+        ws = self._require_workspace()
+        return ws.field_access_summary(self.qualified_name)
+
+    def constructor_assignments(self) -> list[str]:
+        """Fields assigned in the constructor, in bytecode order.
+
+        Returns:
+            List of field names in assignment order.
+        """
+        ws = self._require_workspace()
+        return ws.constructor_assignments(self.qualified_name)
 
 
 def build_class_info(abc: AbcFile, index: int,
@@ -137,7 +220,7 @@ def build_class_info(abc: AbcFile, index: int,
     static_fields, static_methods = resolve_traits(
         abc, cls.traits, is_static=True, method_body_map=method_body_map)
 
-    return ClassInfo(
+    ci = ClassInfo(
         name=name,
         package=package,
         qualified_name=qualified,
@@ -158,6 +241,12 @@ def build_class_info(abc: AbcFile, index: int,
         super_multiname_index=inst.super_name,
         interface_multiname_indices=list(inst.interfaces),
     )
+    # Wire up backrefs so fields/methods can reach the workspace
+    for f in ci.fields + ci.static_fields:
+        f._owner_class = ci
+    for m in ci.methods + ci.static_methods:
+        m._owner_class = ci
+    return ci
 
 
 def build_all_classes(abc: AbcFile) -> list[ClassInfo]:

@@ -18,14 +18,10 @@ def register(sub: argparse._SubParsersAction) -> None:
 
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
-
-    from ..analysis.inheritance import InheritanceGraph
-    graph = InheritanceGraph.from_classes(ws.classes)
-
     name = args.name
 
     if args.ancestors:
-        chain = graph.get_all_parents(name)
+        chain = ws.get_ancestors(name)
         if not chain:
             print(f"No ancestors for '{name}' (root or not found).")
             return
@@ -35,8 +31,8 @@ def run(args: argparse.Namespace) -> None:
         print(f"  {'  ' * len(chain)}{green(name)}")
         return
 
-    children = graph.get_all_children(name)
-    direct = graph.get_children(name)
+    children = ws.get_descendants(name)
+    direct = ws.get_subclasses(name)
 
     if not children and not direct:
         print(f"No subclasses of '{name}'.")
@@ -45,7 +41,7 @@ def run(args: argparse.Namespace) -> None:
     def _print_tree(n: str, depth: int = 0) -> None:
         prefix = "  " * depth
         print(f"{prefix}{green(n) if depth == 0 else n}")
-        for child in sorted(graph.get_children(n)):
+        for child in sorted(ws.get_subclasses(n)):
             _print_tree(child, depth + 1)
 
     _print_tree(name)

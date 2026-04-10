@@ -98,7 +98,7 @@ TAG_NAMES: dict[int, str] = {
 
 # ── SWFTag dataclass ────────────────────────────────────────────────────────
 
-@dataclass
+@dataclass(slots=True)
 class SWFTag:
     """A single tag from a SWF file.
 

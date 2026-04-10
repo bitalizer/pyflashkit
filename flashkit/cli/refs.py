@@ -16,10 +16,7 @@ def register(sub: argparse._SubParsersAction) -> None:
 
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
-
-    from ..analysis.references import ReferenceIndex
-    refs = ReferenceIndex.from_workspace(ws)
-    results = refs.references_to(args.name)
+    results = ws.references_to(args.name)
 
     if not results:
         print(f"No references to '{args.name}'.")

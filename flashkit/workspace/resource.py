@@ -19,7 +19,7 @@ from ..swf.parser import parse_swf
 from ..info.class_info import ClassInfo, build_all_classes
 
 
-@dataclass
+@dataclass(slots=True)
 class Resource:
     """A loaded SWF or SWZ file with parsed ABC content.
 

@@ -101,7 +101,7 @@ def resolve_multiname_full(abc: AbcFile, index: int) -> tuple[str, str]:
     return (package, name)
 
 
-@dataclass
+@dataclass(slots=True)
 class FieldInfo:
     """A resolved field (variable or constant) on a class.
 
@@ -125,9 +125,34 @@ class FieldInfo:
     trait_index: int = 0
     multiname_index: int = 0
     type_multiname_index: int = 0
+    _owner_class: object = field(default=None, repr=False, compare=False)
+
+    @property
+    def readers(self) -> list[str]:
+        """Methods that read this field.
+
+        Returns:
+            Sorted list of method names.
+        """
+        if self._owner_class is None or self._owner_class._workspace is None:
+            return []
+        return self._owner_class._workspace.field_readers(
+            self._owner_class.qualified_name, self.name)
+
+    @property
+    def writers(self) -> list[str]:
+        """Methods that write to this field.
+
+        Returns:
+            Sorted list of method names.
+        """
+        if self._owner_class is None or self._owner_class._workspace is None:
+            return []
+        return self._owner_class._workspace.field_writers(
+            self._owner_class.qualified_name, self.name)
 
 
-@dataclass
+@dataclass(slots=True)
 class MethodInfoResolved:
     """A resolved method, getter, or setter on a class.
 
@@ -157,6 +182,31 @@ class MethodInfoResolved:
     disp_id: int = 0
     trait_index: int = 0
     multiname_index: int = 0
+    _owner_class: object = field(default=None, repr=False, compare=False)
+
+    @property
+    def fields_read(self) -> list[str]:
+        """Fields read by this method.
+
+        Returns:
+            Sorted list of field names.
+        """
+        if self._owner_class is None or self._owner_class._workspace is None:
+            return []
+        return self._owner_class._workspace.fields_read_by(
+            self._owner_class.qualified_name, self.name)
+
+    @property
+    def fields_written(self) -> list[str]:
+        """Fields written by this method.
+
+        Returns:
+            Sorted list of field names.
+        """
+        if self._owner_class is None or self._owner_class._workspace is None:
+            return []
+        return self._owner_class._workspace.fields_written_by(
+            self._owner_class.qualified_name, self.name)
 
 
 def parse_slot_trait(data: bytes) -> tuple[int, int, int, int | None]:

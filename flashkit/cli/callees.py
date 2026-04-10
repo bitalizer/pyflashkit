@@ -16,10 +16,7 @@ def register(sub: argparse._SubParsersAction) -> None:
 
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
-
-    from ..analysis.call_graph import CallGraph
-    graph = CallGraph.from_workspace(ws)
-    edges = graph.get_callees(args.name)
+    edges = ws.callees(args.name)
 
     if not edges:
         print(f"No callees found for '{args.name}'.")
