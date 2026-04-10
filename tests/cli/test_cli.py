@@ -57,7 +57,7 @@ class TestVersion:
             main(["--version"])
         out = capsys.readouterr().out
         assert "flashkit" in out
-        assert "1.0.0" in out
+        assert "1.1.0" in out
 
 
 class TestInfo:

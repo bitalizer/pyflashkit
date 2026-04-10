@@ -35,9 +35,7 @@ print(player.interfaces)    # ["IDisposable", "ITickable"]
 print(player.fields[0].name, player.fields[0].type_name)  # "mHealth", "Number"
 
 # Search strings used in bytecode
-from flashkit.analysis import StringIndex
-strings = StringIndex.from_workspace(ws)
-for s in strings.search("config"):
+for s in ws.search_strings("config"):
     print(s)
 ```
 
@@ -180,30 +178,42 @@ ws.find_classes(package="com.example", is_interface=True)
 
 ### Search and analysis
 
+All analysis is accessed directly through the Workspace — no separate imports needed.
+
 ```python
-from flashkit.search import SearchEngine
-
-engine = SearchEngine(ws)
-
 # Inheritance
-engine.find_subclasses("BaseEntity", transitive=True)
-engine.find_implementors("ISerializable")
+ws.get_subclasses("BaseEntity")
+ws.get_descendants("BaseEntity")       # transitive
+ws.get_ancestors("PlayerManager")
+ws.get_implementors("ISerializable")
 
 # Call graph
-engine.find_callers("toString")
-engine.find_callees("PlayerManager.init")
+ws.callers("toString")
+ws.callees("PlayerManager.init")
 
 # References
-engine.find_instantiators("Point")
-engine.find_type_users("ByteArray")
+ws.references_to("Point")
+ws.references_from("PlayerManager")
+ws.find_instantiators("Point")
+ws.find_type_users("ByteArray")
 
 # Strings
-engine.find_by_string("config")
-engine.find_classes_by_string("http://example.com")
+ws.search_strings("config")
+ws.classes_using_string("http://example.com")
+ws.strings_in_class("PlayerManager")
+
+# Field access
+ws.field_writers("PlayerManager", "mHealth")
+ws.field_readers("PlayerManager", "mHealth")
+ws.fields_written_by("PlayerManager", "takeDamage")
+ws.fields_read_by("PlayerManager", "takeDamage")
+ws.constructor_assignments("PlayerManager")
+ws.field_access_summary("PlayerManager")
 
 # Structural
-engine.find_classes_with_field_type("ByteArray")
-engine.find_methods(return_type="String", name="get")
+ws.find_classes_with_field_type("ByteArray")
+ws.find_methods(return_type="String", name="get")
+ws.find_fields(type_name="int")
 ```
 
 <details>
@@ -272,7 +282,6 @@ flashkit/
   info/          Resolved class model (ClassInfo, FieldInfo, MethodInfo)
   workspace/     File loading and class index
   analysis/      Inheritance, call graph, references, strings, field access
-  search/        Unified query engine
 ```
 
 ## References
