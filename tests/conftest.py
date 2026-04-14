@@ -287,3 +287,12 @@ def swf_data() -> bytes:
 def swf_with_class() -> bytes:
     """SWF containing an ABC block with one class."""
     return build_swf_bytes(build_abc_bytes(with_class=True))
+
+
+@pytest.fixture
+def loaded_workspace(swf_with_class):
+    """A Workspace with one loaded SWF containing TestClass."""
+    from flashkit.workspace.workspace import Workspace
+    ws = Workspace()
+    ws.load_swf_bytes(swf_with_class, name="test.swf")
+    return ws
