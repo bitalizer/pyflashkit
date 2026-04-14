@@ -10,6 +10,11 @@ Also provides ``resolve_trait()`` to parse the raw bytes stored in
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..analysis.method_fingerprint import MethodFingerprint
+
 from dataclasses import dataclass, field
 
 from ..abc.types import AbcFile, TraitInfo, MethodBodyInfo
@@ -183,6 +188,10 @@ class MethodInfoResolved:
     trait_index: int = 0
     multiname_index: int = 0
     _owner_class: object = field(default=None, repr=False, compare=False)
+    _fingerprint_cache: MethodFingerprint | None = field(
+        default=None, repr=False, compare=False)
+    _fingerprint_computed: bool = field(
+        default=False, repr=False, compare=False)
 
     @property
     def fields_read(self) -> list[str]:
@@ -207,6 +216,29 @@ class MethodInfoResolved:
             return []
         return self._owner_class._workspace.fields_written_by(
             self._owner_class.qualified_name, self.name)
+
+    @property
+    def fingerprint(self) -> MethodFingerprint | None:
+        """Method fingerprint for just this method.
+
+        Returns ``None`` if the method body is missing or can't be decoded.
+        Cached on first access.
+
+        Raises:
+            RuntimeError: if this method was created without an owner class
+                (i.e. its ``_owner_class`` is None).
+        """
+        if not self._fingerprint_computed:
+            if self._owner_class is None:
+                raise RuntimeError(
+                    "This MethodInfoResolved has no owner class attached. "
+                    "Build it via build_class_info() or Workspace.load_swf().")
+            owner = self._owner_class
+            abc = owner.abc  # raises RuntimeError if owner has no _abc
+            from ..analysis.method_fingerprint import extract_fingerprint
+            self._fingerprint_cache = extract_fingerprint(owner, self, abc)
+            self._fingerprint_computed = True
+        return self._fingerprint_cache
 
 
 def parse_slot_trait(data: bytes) -> tuple[int, int, int, int | None]:

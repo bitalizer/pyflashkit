@@ -201,3 +201,26 @@ def test_fingerprints_matches_extract_all_fingerprints(loaded_workspace):
     # Content equality (same fingerprints generated). The property caches
     # its own list, so identity differs from a freshly-extracted list.
     assert cls.fingerprints == expected
+
+
+def test_method_fingerprint_returns_fingerprint(loaded_workspace):
+    from flashkit.analysis.method_fingerprint import MethodFingerprint
+    cls = loaded_workspace.get_class("TestClass")
+    m = cls.get_method("doStuff")
+    assert m is not None
+    fp = m.fingerprint
+    assert fp is None or isinstance(fp, MethodFingerprint)
+
+
+def test_method_fingerprint_cached(loaded_workspace):
+    cls = loaded_workspace.get_class("TestClass")
+    m = cls.get_method("doStuff")
+    assert m.fingerprint is m.fingerprint  # identity-stable (even if None)
+
+
+def test_method_fingerprint_raises_without_owner():
+    import pytest
+    from flashkit.info.member_info import MethodInfoResolved
+    m = MethodInfoResolved(name="orphan")
+    with pytest.raises(RuntimeError, match="no owner class"):
+        m.fingerprint
