@@ -15,6 +15,11 @@ Usage::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
+
 from ..abc.types import AbcFile
 from ..abc.disasm import scan_relevant_opcodes
 from ..abc.constants import (
@@ -80,7 +85,7 @@ _ALL_RELEVANT_OPS = frozenset(
 
 
 def build_all_indexes(
-    workspace: object,
+    workspace: Workspace,
 ) -> tuple[StringIndex, ReferenceIndex, FieldAccessIndex]:
     """Build all three bytecode indexes in a single pass.
 
@@ -93,8 +98,7 @@ def build_all_indexes(
     Returns:
         Tuple of (StringIndex, ReferenceIndex, FieldAccessIndex).
     """
-    from ..workspace.workspace import Workspace
-    ws: Workspace = workspace  # type: ignore[assignment]
+    ws = workspace
 
     str_idx = StringIndex()
     ref_idx = ReferenceIndex()
