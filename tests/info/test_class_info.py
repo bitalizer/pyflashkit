@@ -178,3 +178,26 @@ class TestWorkspaceProperty:
         cls = ClassInfo(name="Orphan")
         with pytest.raises(RuntimeError, match="not attached to a Workspace"):
             cls.workspace
+
+
+def test_fingerprints_returns_list(loaded_workspace):
+    cls = loaded_workspace.get_class("TestClass")
+    assert cls is not None
+    fps = cls.fingerprints
+    assert isinstance(fps, list)
+    # TestClass has constructor + doStuff → at least 2 fingerprints
+    assert len(fps) >= 1
+
+
+def test_fingerprints_cached(loaded_workspace):
+    cls = loaded_workspace.get_class("TestClass")
+    assert cls.fingerprints is cls.fingerprints  # identity-stable
+
+
+def test_fingerprints_matches_extract_all_fingerprints(loaded_workspace):
+    from flashkit.analysis.method_fingerprint import extract_all_fingerprints
+    cls = loaded_workspace.get_class("TestClass")
+    expected = extract_all_fingerprints(cls, cls.abc)
+    # Content equality (same fingerprints generated). The property caches
+    # its own list, so identity differs from a freshly-extracted list.
+    assert cls.fingerprints == expected

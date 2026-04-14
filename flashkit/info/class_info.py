@@ -33,6 +33,7 @@ from .member_info import (
 if TYPE_CHECKING:
     from ..workspace.workspace import Workspace
     from ..analysis.references import Reference
+    from ..analysis.method_fingerprint import MethodFingerprint
 
 
 @dataclass(slots=True)
@@ -85,6 +86,8 @@ class ClassInfo:
     interface_multiname_indices: list[int] = field(default_factory=list)
     _abc: AbcFile | None = field(default=None, repr=False, compare=False)
     _workspace: Workspace | None = field(default=None, repr=False, compare=False)
+    _fingerprints_cache: list[MethodFingerprint] | None = field(
+        default=None, repr=False, compare=False)
 
     @property
     def all_fields(self) -> list[FieldInfo]:
@@ -207,6 +210,22 @@ class ClassInfo:
                 "This ClassInfo has no AbcFile attached. "
                 "Build it via build_class_info() or Workspace.load_swf().")
         return self._abc
+
+    @property
+    def fingerprints(self) -> list[MethodFingerprint]:
+        """Method fingerprints for every method on this class.
+
+        Covers the constructor, instance methods, and static methods.
+        Cached on first access. Requires the ClassInfo to have been built
+        with an AbcFile attached (i.e. via build_class_info / Workspace).
+
+        Raises:
+            RuntimeError: if the ClassInfo has no AbcFile attached.
+        """
+        if self._fingerprints_cache is None:
+            from ..analysis.method_fingerprint import extract_all_fingerprints
+            self._fingerprints_cache = extract_all_fingerprints(self, self.abc)
+        return self._fingerprints_cache
 
     @property
     def workspace(self) -> Workspace:
