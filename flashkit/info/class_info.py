@@ -5,6 +5,16 @@ Resolved class information.
 resolved from the constant pool. Consumers get direct string access to
 class names, superclass names, interface names, and fully resolved
 field/method lists.
+
+Public accessors
+----------------
+- ``workspace``: the :class:`~flashkit.workspace.workspace.Workspace` that
+  owns this class.
+- ``abc``: the :class:`~flashkit.abc.types.AbcFile` that defines this class.
+
+The corresponding dataclass fields ``_workspace`` and ``_abc`` are internal;
+they are written by ``build_class_info`` and should not be read directly by
+consumers.
 """
 
 from __future__ import annotations
@@ -22,6 +32,7 @@ from .member_info import (
 
 if TYPE_CHECKING:
     from ..workspace.workspace import Workspace
+    from ..analysis.references import Reference
 
 
 @dataclass(slots=True)
@@ -125,7 +136,7 @@ class ClassInfo:
         return ws.strings_in_class(self.qualified_name)
 
     @property
-    def references_to(self) -> list:
+    def references_to(self) -> list[Reference]:
         """All incoming references to this class.
 
         Returns:
@@ -135,7 +146,7 @@ class ClassInfo:
         return ws.references_to(self.name)
 
     @property
-    def references_from(self) -> list:
+    def references_from(self) -> list[Reference]:
         """All outgoing references from this class.
 
         Returns:
@@ -165,7 +176,7 @@ class ClassInfo:
         return ws.get_ancestors(self.qualified_name)
 
     @property
-    def field_access_summary(self) -> dict[str, dict]:
+    def field_access_summary(self) -> dict[str, dict[str, list[str]]]:
         """Summary of all field accesses in this class.
 
         Returns:
@@ -196,6 +207,16 @@ class ClassInfo:
                 "This ClassInfo has no AbcFile attached. "
                 "Build it via build_class_info() or Workspace.load_swf().")
         return self._abc
+
+    @property
+    def workspace(self) -> Workspace:
+        """The Workspace that owns this class.
+
+        Raises:
+            RuntimeError: if the ClassInfo was built standalone
+                (e.g. via build_class_info without attaching to a Workspace).
+        """
+        return self._require_workspace()
 
     @property
     def constructor_params(self) -> list[str]:

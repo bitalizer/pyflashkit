@@ -163,3 +163,18 @@ class TestMultipleClasses:
 
         class_b = next(c for c in classes if c.name == "ClassB")
         assert class_b.super_name == "ClassA"
+
+
+class TestWorkspaceProperty:
+    """Tests for ClassInfo.workspace public property (1.2.0 API)."""
+
+    def test_workspace_property(self, loaded_workspace):
+        cls = loaded_workspace.get_class("TestClass")
+        assert cls is not None
+        assert cls.workspace is loaded_workspace
+
+    def test_workspace_property_raises_when_standalone(self):
+        from flashkit.info.class_info import ClassInfo
+        cls = ClassInfo(name="Orphan")
+        with pytest.raises(RuntimeError, match="not attached to a Workspace"):
+            cls.workspace
