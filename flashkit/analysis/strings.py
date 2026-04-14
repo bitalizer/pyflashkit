@@ -22,6 +22,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from collections import defaultdict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
 
 from ..abc.types import AbcFile
 from ..abc.disasm import scan_relevant_opcodes
@@ -79,7 +83,7 @@ class StringIndex:
         self.all_strings.add(usage.string)
 
     @classmethod
-    def from_workspace(cls, workspace: object) -> StringIndex:
+    def from_workspace(cls, workspace: Workspace) -> StringIndex:
         """Build a StringIndex from a Workspace.
 
         Walks all method bodies, decodes instructions, and collects
@@ -91,8 +95,7 @@ class StringIndex:
         Returns:
             Populated StringIndex.
         """
-        from ..workspace.workspace import Workspace
-        ws: Workspace = workspace  # type: ignore[assignment]
+        ws = workspace
 
         index = cls()
 

@@ -22,6 +22,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections import defaultdict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
 
 from ..abc.types import AbcFile
 from ..abc.disasm import scan_relevant_opcodes
@@ -115,7 +119,7 @@ class CallGraph:
         default_factory=lambda: defaultdict(list))
 
     @classmethod
-    def from_workspace(cls, workspace: object) -> CallGraph:
+    def from_workspace(cls, workspace: Workspace) -> CallGraph:
         """Build a CallGraph from a Workspace.
 
         Iterates all ABC blocks and their method bodies, decodes

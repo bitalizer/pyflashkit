@@ -21,6 +21,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections import defaultdict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
 
 from ..abc.types import AbcFile
 from ..abc.disasm import scan_relevant_opcodes
@@ -91,7 +95,7 @@ class ReferenceIndex:
         self.by_source[ref.source_class].append(ref)
 
     @classmethod
-    def from_workspace(cls, workspace: object) -> ReferenceIndex:
+    def from_workspace(cls, workspace: Workspace) -> ReferenceIndex:
         """Build a ReferenceIndex from a Workspace.
 
         Scans all class traits and method bodies.
@@ -102,8 +106,7 @@ class ReferenceIndex:
         Returns:
             Populated ReferenceIndex.
         """
-        from ..workspace.workspace import Workspace
-        ws: Workspace = workspace  # type: ignore[assignment]
+        ws = workspace
 
         index = cls()
 

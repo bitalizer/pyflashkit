@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections import defaultdict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..workspace.workspace import Workspace
 
 from ..abc.types import AbcFile
 from ..abc.disasm import scan_relevant_opcodes
@@ -91,7 +95,7 @@ class FieldAccessIndex:
         self.by_class[access.class_name].append(access)
 
     @classmethod
-    def from_workspace(cls, workspace: object) -> FieldAccessIndex:
+    def from_workspace(cls, workspace: Workspace) -> FieldAccessIndex:
         """Build a FieldAccessIndex from a Workspace.
 
         Walks all method bodies, decodes instructions, and collects
@@ -103,8 +107,7 @@ class FieldAccessIndex:
         Returns:
             Populated FieldAccessIndex.
         """
-        from ..workspace.workspace import Workspace
-        ws: Workspace = workspace  # type: ignore[assignment]
+        ws = workspace
 
         index = cls()
         for abc in ws.abc_blocks:
