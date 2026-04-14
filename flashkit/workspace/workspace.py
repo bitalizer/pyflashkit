@@ -670,6 +670,67 @@ class Workspace:
                     break
         return results
 
+    def disassemble_method(
+        self,
+        class_name: str,
+        method_name: str,
+    ) -> list["ResolvedInstruction"]:
+        """Disassemble a method body into readable instructions.
+
+        Decodes the AVM2 bytecode and resolves all operands: multiname
+        indices become field/class/method names, string indices become
+        quoted literals, int/uint/double become numeric values.
+
+        Use ``"<init>"`` for the instance constructor and ``"<cinit>"``
+        for the static initializer.
+
+        Args:
+            class_name: Class name (simple or qualified).
+            method_name: Method name, or ``"<init>"``/``"<cinit>"``.
+
+        Returns:
+            List of ``ResolvedInstruction`` — each has ``offset``,
+            ``mnemonic``, and ``operands`` (list of readable strings).
+
+        Raises:
+            KeyError: If class or method not found.
+            ValueError: If method has no body (abstract/interface).
+        """
+        from ..abc.disasm import decode_instructions, resolve_instructions
+        from ..info.member_info import build_method_body_map
+
+        cls = self.get_class(class_name)
+        if cls is None:
+            raise KeyError(f"Class '{class_name}' not found")
+
+        abc = cls._abc
+        if abc is None:
+            raise ValueError(
+                f"Class '{class_name}' has no AbcFile back-reference")
+
+        # Constructor / static initializer
+        if method_name in ("<init>", "<cinit>"):
+            method_idx = (cls.constructor_index if method_name == "<init>"
+                          else cls.static_init_index)
+            body_map = build_method_body_map(abc)
+            if method_idx not in body_map:
+                raise ValueError(
+                    f"{method_name} on '{class_name}' has no body")
+            body = abc.method_bodies[body_map[method_idx]]
+        else:
+            method = cls.get_method(method_name)
+            if method is None:
+                raise KeyError(
+                    f"Method '{method_name}' not found on '{class_name}'")
+            if method.body_index < 0:
+                raise ValueError(
+                    f"Method '{method_name}' on '{class_name}' has no body "
+                    f"(abstract or interface method)")
+            body = abc.method_bodies[method.body_index]
+
+        raw = decode_instructions(body.code)
+        return resolve_instructions(abc, raw)
+
     def find_classes_with_method_returning(
         self, return_type: str,
     ) -> list[ClassInfo]:

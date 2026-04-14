@@ -43,6 +43,24 @@ class Instruction:
     size: int = 1
 
 
+@dataclass(slots=True)
+class ResolvedInstruction:
+    """An AVM2 instruction with operands resolved to readable names.
+
+    Created by ``resolve_instructions()`` from raw ``Instruction`` objects.
+    Multiname indices become class/field/method names, string indices become
+    quoted literals, int/uint/double indices become numeric values.
+
+    Attributes:
+        offset: Byte offset in the method body.
+        mnemonic: Opcode name (e.g. ``"getproperty"``).
+        operands: Human-readable operand strings.
+    """
+    offset: int
+    mnemonic: str
+    operands: list[str] = field(default_factory=list)
+
+
 # ── Opcode table ────────────────────────────────────────────────────────────
 # Maps opcode → (mnemonic, operand_format)
 # Operand formats:
@@ -472,3 +490,109 @@ def decode_instructions(code: bytes,
             operands=operands, size=off - start))
 
     return instructions
+
+
+# ── Opcodes grouped by operand resolution type ─────────────────────────────
+# First operand is a multiname pool index
+_MULTINAME_FIRST = frozenset({
+    OP_getproperty, OP_setproperty, OP_initproperty,
+    OP_getlex, OP_findpropstrict,
+    OP_callproperty, OP_callpropvoid, OP_constructprop,
+    OP_coerce,
+    # Extra opcodes (from _EXTRA_OPCODES)
+    0x04,  # getsuper
+    0x05,  # setsuper
+    0x5E,  # findproperty
+    0x45,  # callsuper
+    0x4C,  # callproplex
+    0x4E,  # callsupervoid
+    0x59,  # getdescendants
+    0x6A,  # deleteproperty
+    0x80,  # coerce
+    0x86,  # astype
+    0xB2,  # istype
+})
+
+# First operand is a string pool index
+_STRING_FIRST = frozenset({OP_pushstring})
+
+# First operand is an int pool index
+_INT_FIRST = frozenset({OP_pushint})
+
+# First operand is a uint pool index
+_UINT_FIRST = frozenset({OP_pushuint})
+
+# First operand is a double pool index
+_DOUBLE_FIRST = frozenset({OP_pushdouble})
+
+
+def resolve_instructions(
+    abc: "AbcFile",
+    instructions: list[Instruction],
+) -> list[ResolvedInstruction]:
+    """Resolve raw instruction operands to human-readable strings.
+
+    Multiname indices become names, string indices become quoted strings,
+    int/uint/double indices become literal values. Everything else stays
+    as raw numbers.
+
+    Args:
+        abc: The AbcFile for constant pool lookups.
+        instructions: Raw decoded instructions.
+
+    Returns:
+        List of ResolvedInstruction with string operands.
+    """
+    from .types import AbcFile as _AbcFile  # noqa: F811
+    from ..info.member_info import resolve_multiname
+
+    resolved = []
+    for instr in instructions:
+        ops: list[str] = []
+        op = instr.opcode
+
+        for i, val in enumerate(instr.operands):
+            if i == 0 and op in _MULTINAME_FIRST:
+                try:
+                    ops.append(resolve_multiname(abc, val))
+                except (IndexError, KeyError):
+                    ops.append(f"multiname[{val}]")
+            elif i == 0 and op in _STRING_FIRST:
+                if 0 < val < len(abc.string_pool):
+                    ops.append(f'"{abc.string_pool[val]}"')
+                else:
+                    ops.append(f"string[{val}]")
+            elif i == 0 and op in _INT_FIRST:
+                if 0 < val < len(abc.int_pool):
+                    ops.append(str(abc.int_pool[val]))
+                else:
+                    ops.append(f"int[{val}]")
+            elif i == 0 and op in _UINT_FIRST:
+                if 0 < val < len(abc.uint_pool):
+                    ops.append(str(abc.uint_pool[val]))
+                else:
+                    ops.append(f"uint[{val}]")
+            elif i == 0 and op in _DOUBLE_FIRST:
+                if 0 < val < len(abc.double_pool):
+                    ops.append(str(abc.double_pool[val]))
+                else:
+                    ops.append(f"double[{val}]")
+            elif i == 0 and op == OP_newclass:
+                # val = class index
+                if 0 <= val < len(abc.instances):
+                    try:
+                        ops.append(resolve_multiname(abc, abc.instances[val].name))
+                    except (IndexError, KeyError):
+                        ops.append(f"class[{val}]")
+                else:
+                    ops.append(f"class[{val}]")
+            else:
+                ops.append(str(val))
+
+        resolved.append(ResolvedInstruction(
+            offset=instr.offset,
+            mnemonic=instr.mnemonic,
+            operands=ops,
+        ))
+
+    return resolved
