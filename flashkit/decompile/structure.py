@@ -33,7 +33,8 @@ from typing import Optional
 from ..graph.cfg import CFG, BasicBlock
 from ..graph.loops import Loop
 from .ast.nodes import (
-    BlockStmt, BreakStmt, IfStmt, Statement, WhileStmt,
+    BlockStmt, BreakStmt, CatchClause, IfStmt, Literal, Statement,
+    SwitchCase, SwitchStmt, TryStmt, WhileStmt,
 )
 from .stack import BlockSimResult
 
@@ -92,6 +93,16 @@ class _StructureContext:
         # Visited blocks within the current top-level recursion. Prevents
         # infinite loops on pathological input.
         self._emitted: set[int] = set()
+        # Exception regions that have already been wrapped in a TryStmt
+        # — identified by ``id(ExceptionInfo)`` so duplicate handlers
+        # with identical fields don't confuse us.
+        self._wrapped_handlers: set[int] = set()
+        # Which blocks are catch entries — don't re-emit them while
+        # walking the main path. Each catch block is consumed by the
+        # TryStmt wrapping of its handler region.
+        self._catch_entries: set[int] = {
+            h.target for bb in cfg.blocks for h in bb.exception_handlers
+        }
 
     # ── block lookups ──────────────────────────────────────────────────────
 
@@ -123,6 +134,19 @@ class _StructureContext:
                 # structure_loop's stop_at=header sentinel before we
                 # get here.
                 break
+
+            # Try-region entry? Emit a TryStmt wrapping the protected
+            # flow and each catch clause. We only wrap once per handler
+            # — subsequent passes see the handler in _wrapped_handlers
+            # and fall through to normal structuring.
+            handlers = self._handlers_starting_at(current)
+            if handlers:
+                for h in handlers:
+                    self._wrapped_handlers.add(id(h))
+                stmts.append(self._structure_try_region(current, handlers))
+                current = self._try_continuation(current, handlers)
+                continue
+
             self._emitted.add(current.index)
 
             # Loop header? Emit the loop and continue from its exit.
@@ -196,10 +220,16 @@ class _StructureContext:
                 current = None
                 continue
 
-            # Switch: Phase 7. For now, emit statements and stop.
+            # Switch.
             if terminator == "switch":
                 stmts.extend(block_result.statements)
-                current = None
+                stmts.append(self._structure_switch(current, block_result))
+                # Continue from the merge point (post-dom) if there is
+                # one; otherwise stop — all case bodies were already
+                # recursively structured up to that point.
+                pdom_idx = self.ipostdom.get(current.index, -1)
+                current = (self._block_by_index(pdom_idx)
+                           if pdom_idx >= 0 else None)
                 continue
 
             # Jump or fall-through: emit statements, continue with sole
@@ -302,6 +332,126 @@ class _StructureContext:
         return None
 
     # ── condition simplification ──────────────────────────────────────────
+
+    # ── switch structuring ────────────────────────────────────────────────
+
+    def _structure_switch(self, block: BasicBlock,
+                          block_result: BlockSimResult) -> SwitchStmt:
+        """Build a ``SwitchStmt`` from a ``lookupswitch`` terminator.
+
+        ``block_result.switch_targets`` is ``[default, case_0,
+        case_1, ...]``. Each case body is structured up to the switch's
+        post-dominator (the natural merge point after the switch).
+        """
+        targets = block_result.switch_targets
+        default_off = targets[0]
+        case_offs = targets[1:]
+
+        pdom_idx = self.ipostdom.get(block.index, -1)
+        pdom = self._block_by_index(pdom_idx) if pdom_idx >= 0 else None
+
+        # Map each target offset to its corresponding block.
+        def _bb_at(off):
+            return self.cfg.blocks_by_offset.get(off)
+
+        # Deduplicate targets while preserving order.
+        cases: list[SwitchCase] = []
+        seen_targets: dict[int, int] = {}  # offset -> index in `cases`
+        for i, case_off in enumerate(case_offs):
+            case_bb = _bb_at(case_off)
+            if case_bb is None:
+                continue
+            key = Literal(i)
+            if case_off in seen_targets:
+                # Same block shared between multiple case labels — emit
+                # another empty case label that falls through to the
+                # shared body. We model this by appending a fresh case
+                # with empty body; the printer handles fall-through as
+                # "no break => runs into next case".
+                cases.append(SwitchCase(label=key, body=[]))
+                continue
+            seen_targets[case_off] = len(cases)
+            body_stmts = self.structure_region(case_bb, stop_at=pdom)
+            cases.append(SwitchCase(label=key, body=body_stmts))
+
+        default_bb = _bb_at(default_off)
+        if default_bb is not None and default_off not in seen_targets:
+            default_stmts = self.structure_region(default_bb, stop_at=pdom)
+            cases.append(SwitchCase(label=None, body=default_stmts))
+        elif default_bb is not None:
+            cases.append(SwitchCase(label=None, body=[]))
+
+        discriminant = block_result.branch_condition
+        if discriminant is None:
+            from .ast.nodes import Identifier
+            discriminant = Identifier("_switch_value")
+        return SwitchStmt(discriminant=discriminant, cases=cases)
+
+    # ── try/catch structuring ─────────────────────────────────────────────
+
+    def _handlers_starting_at(self, block: BasicBlock) -> list:
+        """Return exception handlers whose protected region begins at
+        ``block`` and that haven't been wrapped yet."""
+        out = []
+        for h in block.exception_handlers:
+            if id(h) in self._wrapped_handlers:
+                continue
+            # A handler "starts at" this block if the block's offset
+            # equals the handler's from_offset.
+            if block.start_offset == h.from_offset:
+                out.append(h)
+        return out
+
+    def _structure_try_region(self, entry: BasicBlock, handlers) -> TryStmt:
+        """Build a ``TryStmt`` for the protected region starting at
+        ``entry`` and covered by ``handlers``."""
+        # All handlers share the same protected range; use the first
+        # one's to/from to bound the region.
+        first = handlers[0]
+        # Find a "stop" block — the first block whose start_offset is
+        # at or beyond to_offset, if any. Otherwise stop at None (end).
+        stop = None
+        for bb in self.cfg.blocks:
+            if bb.start_offset >= first.to_offset:
+                stop = bb
+                break
+
+        # Structure the protected body. We temporarily mark each
+        # catch-entry as "emitted" so it doesn't get walked during the
+        # protected-body recursion.
+        try_stmts = self.structure_region(entry, stop_at=stop)
+
+        # Catch bodies may extend past the handler's to_offset — they
+        # stop at their own terminator, or at the first block that
+        # neither is a catch entry nor lies inside the protected
+        # region. We pick the try continuation (``stop`` above) only
+        # when it is not the catch block itself.
+        catches: list[CatchClause] = []
+        for h in handlers:
+            catch_bb = self.cfg.blocks_by_offset.get(h.target)
+            if catch_bb is None:
+                continue
+            var_name = f"_catch{len(catches)}_"
+            catch_stop = stop if stop is not catch_bb else None
+            catch_stmts = self.structure_region(catch_bb, stop_at=catch_stop)
+            catches.append(CatchClause(
+                var=var_name, var_type=None,
+                body=BlockStmt(catch_stmts),
+            ))
+
+        return TryStmt(
+            try_body=BlockStmt(try_stmts),
+            catches=catches,
+            finally_body=None,
+        )
+
+    def _try_continuation(self, entry: BasicBlock, handlers) -> Optional[BasicBlock]:
+        """Where the main walk should resume after a try/catch."""
+        first = handlers[0]
+        for bb in self.cfg.blocks:
+            if bb.start_offset >= first.to_offset and bb.index not in self._catch_entries:
+                return bb
+        return None
 
     def _simplify_condition(self, cond):
         """Peel any number of leading ``!`` wrappers.
