@@ -36,7 +36,25 @@ def apply_patterns(node: N.Node) -> N.Node:
     node = _CollapseDoubleNot().visit(node)
     node = _CompoundAssign().visit(node)
     node = _TernaryFromIf().visit(node)
+    node = _InlineElseAfterReturn().visit(node)
     node = _ForFromWhile().visit(node)
+    node = _strip_trailing_bare_return_at_top(node)
+    return node
+
+
+def _strip_trailing_bare_return_at_top(node: N.Node) -> N.Node:
+    """Drop a trailing ``return;`` from the outermost ``BlockStmt``.
+
+    Every AS3 function has an implicit void return, so an explicit
+    bare return on the last statement is redundant noise. A return
+    with a value is kept — its expression is meaningful. Nested
+    blocks (inside if/while/switch arms) keep their returns because
+    they may guard early exit paths."""
+    if (isinstance(node, N.BlockStmt)
+            and node.statements
+            and isinstance(node.statements[-1], N.ReturnStmt)
+            and node.statements[-1].value is None):
+        return N.BlockStmt(list(node.statements[:-1]))
     return node
 
 
@@ -162,6 +180,60 @@ def _single_assign_in(stmt: N.Node) -> N.AssignExpr | None:
     return None
 
 
+class _InlineElseAfterReturn(_Transform):
+    """``if (c) { ... return; } else { body }`` → ``if (c) { ... return; }
+    body``.
+
+    When the then-branch of an if ends in a ``ReturnStmt`` or
+    ``ThrowStmt`` (or an unconditional ``BreakStmt``/``ContinueStmt``),
+    control can't fall through into the merge — so an ``else`` block is
+    redundant. Lift its statements up to the enclosing block so they
+    run unconditionally after the if.
+
+    Only fires when the enclosing ``BlockStmt`` can accept the lifted
+    statements. Nested if/else chains (``else if``) are left alone —
+    the rewrite would disturb their meaning.
+    """
+
+    def visit_BlockStmt(self, node: N.BlockStmt) -> N.Node:
+        stmts = [self.visit(s) for s in node.statements]
+        rewrote = False
+        new_stmts: list[N.Statement] = []
+        for stmt in stmts:
+            if (isinstance(stmt, N.IfStmt)
+                    and stmt.else_body is not None
+                    and not isinstance(stmt.else_body, N.IfStmt)
+                    and _body_never_falls_through(stmt.then_body)):
+                new_stmts.append(N.IfStmt(stmt.cond, stmt.then_body, None))
+                new_stmts.extend(_flatten_block(stmt.else_body))
+                rewrote = True
+            else:
+                new_stmts.append(stmt)
+        if rewrote or new_stmts != list(node.statements):
+            return N.BlockStmt(new_stmts)
+        return node
+
+
+def _body_never_falls_through(stmt: N.Node) -> bool:
+    """Does ``stmt`` (typically a BlockStmt) always exit — return,
+    throw, break, or continue — so nothing after it can run?"""
+    if isinstance(stmt, (N.ReturnStmt, N.ThrowStmt,
+                         N.BreakStmt, N.ContinueStmt)):
+        return True
+    if isinstance(stmt, N.BlockStmt) and stmt.statements:
+        return _body_never_falls_through(stmt.statements[-1])
+    if isinstance(stmt, N.IfStmt) and stmt.else_body is not None:
+        return (_body_never_falls_through(stmt.then_body)
+                and _body_never_falls_through(stmt.else_body))
+    return False
+
+
+def _flatten_block(stmt: N.Node) -> list[N.Statement]:
+    if isinstance(stmt, N.BlockStmt):
+        return list(stmt.statements)
+    return [stmt]
+
+
 class _ForFromWhile(_Transform):
     """Detect ``init; while (cond) { ...body; step; }`` and rewrite as
     ``for (init; cond; step) { ...body }``.
@@ -243,3 +315,5 @@ def _cond_references(cond: N.Node, target: N.Node) -> bool:
                     if isinstance(item, N.Node) and _cond_references(item, target):
                         return True
     return False
+
+

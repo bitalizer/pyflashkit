@@ -209,6 +209,103 @@ def test_while_without_step_stays_while():
     assert "while (i < 10)" in _p(rewritten)
 
 
+# ── else-of-returning-if collapse ─────────────────────────────────────────
+
+
+def test_if_return_else_inlines_the_else():
+    # if (c) { return 1 } else { return 0 }  -> if (c) { return 1 } return 0
+    ast = BlockStmt([
+        IfStmt(
+            Identifier("c"),
+            BlockStmt([ReturnStmt(Literal(1))]),
+            BlockStmt([ReturnStmt(Literal(0))]),
+        ),
+    ])
+
+    rewritten = apply_patterns(ast)
+
+    assert _p(rewritten) == (
+        "{\n"
+        "    if (c) {\n"
+        "        return 1;\n"
+        "    }\n"
+        "    return 0;\n"
+        "}"
+    )
+
+
+def test_if_throw_else_inlines_the_else():
+    ast = BlockStmt([
+        IfStmt(
+            Identifier("c"),
+            BlockStmt([ReturnStmt(None)]),
+            BlockStmt([ExpressionStmt(Identifier("cleanup"))]),
+        ),
+    ])
+    rewritten = apply_patterns(ast)
+    assert _p(rewritten) == (
+        "{\n"
+        "    if (c) {\n"
+        "        return;\n"
+        "    }\n"
+        "    cleanup;\n"
+        "}"
+    )
+
+
+def test_trailing_bare_return_stripped():
+    # A method body that ends with ``return;`` has the trailing return
+    # elided — AS3 adds an implicit void return at the end of every
+    # function.
+    ast = BlockStmt([
+        ExpressionStmt(Identifier("x")),
+        ReturnStmt(None),
+    ])
+    rewritten = apply_patterns(ast)
+    assert _p(rewritten) == (
+        "{\n"
+        "    x;\n"
+        "}"
+    )
+
+
+def test_trailing_return_with_value_kept():
+    # Only a BARE return (no value) is trailing-implicit. ``return x;``
+    # stays.
+    ast = BlockStmt([
+        ReturnStmt(Identifier("x")),
+    ])
+    rewritten = apply_patterns(ast)
+    assert "return x" in _p(rewritten)
+
+
+def test_only_statement_is_bare_return_body_becomes_empty():
+    ast = BlockStmt([ReturnStmt(None)])
+    rewritten = apply_patterns(ast)
+    assert _p(rewritten) == "{\n}"
+
+
+def test_if_non_terminating_else_kept():
+    # Then branch doesn't end in return/throw -> keep the else.
+    ast = BlockStmt([
+        IfStmt(
+            Identifier("c"),
+            BlockStmt([ExpressionStmt(Identifier("x"))]),
+            BlockStmt([ExpressionStmt(Identifier("y"))]),
+        ),
+    ])
+    rewritten = apply_patterns(ast)
+    assert _p(rewritten) == (
+        "{\n"
+        "    if (c) {\n"
+        "        x;\n"
+        "    } else {\n"
+        "        y;\n"
+        "    }\n"
+        "}"
+    )
+
+
 # ── idempotence ───────────────────────────────────────────────────────────
 
 

@@ -152,11 +152,28 @@ _CONDITIONAL_BRANCH_BUILDERS: dict[int, Any] = {
 
 
 class BlockStackSim:
-    """One instance per method (or per CFG walk). Holds the ``AbcFile``
-    for constant-pool resolution."""
+    """One instance per method. Holds the ``AbcFile`` for constant-pool
+    resolution plus optional per-method context for nicer local names.
 
-    def __init__(self, abc: AbcFile):
+    Args:
+        abc: The parsed ABC file.
+        param_count: Number of parameters on the method being
+            simulated. Locals ``1..param_count`` are named
+            ``_arg_1``..``_arg_N`` to match the AS3 parameter
+            convention; locals past that range keep the generic
+            ``_loc{reg}_`` naming. Defaults to ``0`` when the caller
+            doesn't know (generic local names throughout).
+        local0_name: Name to use for local-register-0. Defaults to
+            ``"this"``. Static methods pass the class name (the class
+            object lives in local-0 for static dispatch).
+    """
+
+    def __init__(self, abc: AbcFile, *,
+                 param_count: int = 0,
+                 local0_name: str = "this"):
         self.abc = abc
+        self.param_count = param_count
+        self.local0_name = local0_name
 
     def run(self, bb) -> BlockSimResult:
         """Simulate one basic block.
@@ -256,14 +273,13 @@ class BlockStackSim:
 
         # Locals
         if op == OP_GETLOCAL_0:
-            stack.append(Identifier("this")); return False
+            stack.append(Identifier(self._local_name(0))); return False
         if op in (OP_GETLOCAL_1, OP_GETLOCAL_2, OP_GETLOCAL_3):
             reg = op - OP_GETLOCAL_0
-            stack.append(Identifier(f"_loc{reg}_")); return False
+            stack.append(Identifier(self._local_name(reg))); return False
         if op == OP_GETLOCAL:
             reg = instr.operands[0]
-            name = "this" if reg == 0 else f"_loc{reg}_"
-            stack.append(Identifier(name)); return False
+            stack.append(Identifier(self._local_name(reg))); return False
         if op in (OP_SETLOCAL_0, OP_SETLOCAL_1, OP_SETLOCAL_2,
                   OP_SETLOCAL_3):
             reg = op - OP_SETLOCAL_0
@@ -401,9 +417,15 @@ class BlockStackSim:
                 value = stack.pop()
                 target = stack.pop()
                 name = resolve_multiname(self.abc, instr.operands[0])
-                statements.append(ExpressionStmt(
-                    AssignExpr(MemberAccess(target, name), value),
-                ))
+                if isinstance(target, Identifier) and target.name == name:
+                    # findpropstrict + setproperty on the same name:
+                    # collapse to ``name = value`` rather than
+                    # ``name.name = value``. Mirrors the same idiom
+                    # recognised on the getproperty side.
+                    lhs: Expression = target
+                else:
+                    lhs = MemberAccess(target, name)
+                statements.append(ExpressionStmt(AssignExpr(lhs, value)))
             return False
         if op == OP_GETSLOT:
             if stack:
@@ -547,8 +569,8 @@ class BlockStackSim:
                 reg1, reg2 = instr.operands
                 stack.append(MethodCall(
                     Identifier("_hasnext2"),
-                    [Identifier(f"_loc{reg1}_"),
-                     Identifier(f"_loc{reg2}_")],
+                    [Identifier(self._local_name(reg1)),
+                     Identifier(self._local_name(reg2))],
                 ))
             elif op == OP_HASNEXT:
                 if len(stack) >= 2:
@@ -617,10 +639,22 @@ class BlockStackSim:
         if not stack:
             return
         value = stack.pop()
-        name = "this" if reg == 0 else f"_loc{reg}_"
         statements.append(ExpressionStmt(
-            AssignExpr(Identifier(name), value),
+            AssignExpr(Identifier(self._local_name(reg)), value),
         ))
+
+    def _local_name(self, reg: int) -> str:
+        """Return the source-visible name for local register ``reg``.
+
+        Register 0 is ``this`` (or the class name for static methods).
+        Registers ``1..param_count`` are ``_arg_1..._arg_N`` to match
+        the AS3 parameter naming convention; higher registers fall
+        back to the generic ``_loc{reg}_`` form."""
+        if reg == 0:
+            return self.local0_name
+        if 1 <= reg <= self.param_count:
+            return f"_arg_{reg}"
+        return f"_loc{reg}_"
 
     def _pop_args(self, stack, n: int) -> list[Expression]:
         """Pop ``n`` arguments off the stack in call order

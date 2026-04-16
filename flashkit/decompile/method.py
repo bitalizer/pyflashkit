@@ -97,10 +97,13 @@ class MethodDecompiler:
             ipostdom = compute_ipostdom(cfg)
             loops = find_loops(cfg, idom)
 
+            param_count = self._param_count_of(method_idx)
             sim = BlockStackSim(
                 self._raw_abc,
-                local0_name=class_name if (is_static and class_name) else "this",
-            ) if _sim_accepts_local0() else BlockStackSim(self._raw_abc)
+                param_count=param_count,
+                local0_name=(class_name if (is_static and class_name)
+                             else "this"),
+            )
             block_results = {bb.index: sim.run(bb) for bb in cfg.blocks}
 
             root = structure_method(cfg, idom, ipostdom, loops, block_results)
@@ -125,11 +128,19 @@ class MethodDecompiler:
         getter = getattr(mbs, "get", None)
         if callable(getter):
             return getter(method_idx)
-        # List-like: scan for the matching body.method.
         for b in mbs:
             if getattr(b, "method", None) == method_idx:
                 return b
         return None
+
+    def _param_count_of(self, method_idx: int) -> int:
+        """Number of declared parameters on the given method, or 0 when
+        the method table is absent or the index is out of range."""
+        methods = getattr(self._raw_abc, "methods", None)
+        if not methods or not (0 <= method_idx < len(methods)):
+            return 0
+        m = methods[method_idx]
+        return int(getattr(m, "param_count", 0) or 0)
 
 
 # ── output shaping ─────────────────────────────────────────────────────────
@@ -174,10 +185,3 @@ def _reindent_body(printed: str, indent: str) -> str:
     return "\n".join(f"{indent}{s}" if s else "" for s in stripped) + "\n"
 
 
-def _sim_accepts_local0() -> bool:
-    """Feature-flag: later the stack simulator can be extended to take
-    a ``local0_name`` so static-method bodies show the class name
-    instead of ``this``. Until that lands the simulator always uses
-    ``this`` for local-0 and callers that need the class-name
-    substitution should post-process with ``str.replace``."""
-    return False
