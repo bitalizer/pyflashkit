@@ -9,5 +9,9 @@ added in later phases.
 """
 
 from .cfg import BasicBlock, CFG, build_cfg_from_bytecode
+from .dominators import compute_idom, compute_ipostdom
 
-__all__ = ["BasicBlock", "CFG", "build_cfg_from_bytecode"]
+__all__ = [
+    "BasicBlock", "CFG", "build_cfg_from_bytecode",
+    "compute_idom", "compute_ipostdom",
+]
