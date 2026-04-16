@@ -129,6 +129,18 @@ def read_u8(data: bytes, offset: int) -> tuple[int, int]:
     return data[offset], offset + 1
 
 
+def read_s24(data: bytes, offset: int) -> tuple[int, int]:
+    """Read a signed 24-bit little-endian integer (branch offset).
+
+    Returns:
+        Tuple of (value, new_offset).
+    """
+    v = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16)
+    if v & 0x800000:
+        v -= 0x1000000
+    return v, offset + 3
+
+
 def read_u16(data: bytes, offset: int) -> tuple[int, int]:
     """Read a 16-bit unsigned integer (little-endian)."""
     return struct.unpack_from("<H", data, offset)[0], offset + 2

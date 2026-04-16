@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Import each command module — each one registers itself.
     from . import (
         info, tags, classes, class_cmd, strings,
-        disasm, callers, callees, refs, tree,
+        disasm, decompile, callers, callees, refs, tree,
         packages, extract, build, field_access,
     )
 
@@ -40,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     class_cmd.register(sub)
     strings.register(sub)
     disasm.register(sub)
+    decompile.register(sub)
     callers.register(sub)
     callees.register(sub)
     refs.register(sub)

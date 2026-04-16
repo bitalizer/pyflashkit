@@ -450,7 +450,64 @@ MNEMONIC_TO_OPCODE: dict[str, int] = {
 }
 
 
+# ── Increment/decrement pattern helper ──────────────────────────────────────
+
+_INC_OPS = frozenset({OP_INCREMENT, OP_INCREMENT_I})
+_INCDEC_OPS = frozenset({OP_INCREMENT, OP_INCREMENT_I, OP_DECREMENT, OP_DECREMENT_I})
+
+
+def match_local_incdec(code: bytes, p: int, reg_idx: int):
+    """Detect a pre/post increment/decrement pattern after a getlocal.
+
+    AVM2 compilers emit ``a++`` as a short sequence of ``dup + increment +
+    setlocal`` (post) or ``increment + dup + setlocal`` (pre). Given the
+    offset right after a ``getlocal`` for register ``reg_idx``, this helper
+    tests whether the following bytes match either pattern.
+
+    Returns:
+        ``(is_pre, is_increment, new_p)`` if a pattern matches, else ``None``.
+    """
+    from .parser import read_u30
+
+    if p + 2 > len(code):
+        return None
+    b0 = code[p]
+    b1 = code[p + 1] if p + 1 < len(code) else 0xFF
+
+    def _check_setlocal(pos: int):
+        if pos >= len(code):
+            return None
+        op = code[pos]
+        if 0 <= reg_idx <= 3 and op == OP_SETLOCAL_0 + reg_idx:
+            return pos + 1
+        if op == OP_SETLOCAL:
+            if pos + 1 >= len(code):
+                return None
+            idx, new_p = read_u30(code, pos + 1)
+            if idx == reg_idx:
+                return new_p
+        return None
+
+    # Post: dup -> inc/dec -> setlocal_N
+    if b0 == OP_DUP and b1 in _INCDEC_OPS:
+        is_inc = b1 in _INC_OPS
+        r = _check_setlocal(p + 2)
+        if r is not None:
+            return (False, is_inc, r)
+
+    # Pre: inc/dec -> dup -> setlocal_N
+    if b0 in _INCDEC_OPS and b1 == OP_DUP:
+        is_inc = b0 in _INC_OPS
+        r = _check_setlocal(p + 2)
+        if r is not None:
+            return (True, is_inc, r)
+    return None
+
+
 __all__ = [name for name in globals() if name.startswith("OP_")] + [
     "OPCODE_TABLE",
     "MNEMONIC_TO_OPCODE",
+    "match_local_incdec",
+    "_INC_OPS",
+    "_INCDEC_OPS",
 ]
