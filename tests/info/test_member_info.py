@@ -17,9 +17,6 @@ from flashkit.abc.constants import (
 from flashkit.info.member_info import (
     resolve_multiname,
     resolve_multiname_full,
-    parse_slot_trait,
-    parse_method_trait,
-    parse_class_trait,
     resolve_traits,
     build_method_body_map,
     FieldInfo,
@@ -259,89 +256,48 @@ class TestResolveMultinameFull:
         assert pkg == ""
 
 
-# ── parse_slot_trait ───────────────────────────────────────────────────
+# ── Enriched TraitInfo: fields populated by parser ─────────────────────
 
 
-class TestParseSlotTrait:
-    def _build_slot_data(self, name_mn, kind, slot_id, type_mn, vindex):
-        data = bytearray()
-        data += write_u30(name_mn)
-        data += bytes([kind])
-        data += write_u30(slot_id)
-        data += write_u30(type_mn)
-        data += write_u30(vindex)
-        return bytes(data)
+class TestTraitInfoFields:
+    """Trait fields (slot_id, method_idx, etc.) are populated by parse_abc
+    and survive write/parse round-trip."""
 
-    def test_basic_slot(self):
-        data = self._build_slot_data(name_mn=3, kind=TRAIT_Slot, slot_id=1, type_mn=4, vindex=0)
-        name_mn, slot_id, type_mn, default_val = parse_slot_trait(data)
-        assert name_mn == 3
-        assert slot_id == 1
-        assert type_mn == 4
-        assert default_val is None
+    def test_slot_fields(self):
+        b = AbcBuilder()
+        name_str = b.string("myField")
+        type_str = b.string("int")
+        ns = b.package_namespace(0)
+        name_mn = b.qname(ns, name_str)
+        type_mn = b.qname(ns, type_str)
+        b.define_class(
+            name=name_mn, super_name=0,
+            instance_traits=[AbcBuilder.trait_slot(name_mn, type_mn, slot_id=3)],
+        )
+        abc = parse_abc(serialize_abc(b.build()))
+        t = abc.instances[0].traits[0]
+        assert t.kind == TRAIT_Slot
+        assert t.name == name_mn
+        assert t.slot_id == 3
+        assert t.type_name == type_mn
+        assert t.vindex == 0
 
-    def test_slot_with_default(self):
-        data = self._build_slot_data(name_mn=5, kind=TRAIT_Slot, slot_id=2, type_mn=6, vindex=7)
-        name_mn, slot_id, type_mn, default_val = parse_slot_trait(data)
-        assert name_mn == 5
-        assert slot_id == 2
-        assert type_mn == 6
-        assert default_val == 7
-
-    def test_const_trait(self):
-        data = self._build_slot_data(name_mn=1, kind=TRAIT_Const, slot_id=0, type_mn=2, vindex=0)
-        name_mn, slot_id, type_mn, default_val = parse_slot_trait(data)
-        assert name_mn == 1
-        assert default_val is None
-
-
-# ── parse_method_trait ─────────────────────────────────────────────────
-
-
-class TestParseMethodTrait:
-    def _build_method_data(self, name_mn, kind, disp_id, method_idx):
-        data = bytearray()
-        data += write_u30(name_mn)
-        data += bytes([kind])
-        data += write_u30(disp_id)
-        data += write_u30(method_idx)
-        return bytes(data)
-
-    def test_basic_method(self):
-        data = self._build_method_data(name_mn=5, kind=TRAIT_Method, disp_id=0, method_idx=1)
-        name_mn, disp_id, method_idx = parse_method_trait(data)
-        assert name_mn == 5
-        assert disp_id == 0
-        assert method_idx == 1
-
-    def test_getter(self):
-        data = self._build_method_data(name_mn=3, kind=TRAIT_Getter, disp_id=0, method_idx=2)
-        name_mn, disp_id, method_idx = parse_method_trait(data)
-        assert name_mn == 3
-        assert method_idx == 2
-
-    def test_setter(self):
-        data = self._build_method_data(name_mn=4, kind=TRAIT_Setter, disp_id=1, method_idx=3)
-        name_mn, disp_id, method_idx = parse_method_trait(data)
-        assert name_mn == 4
-        assert disp_id == 1
-        assert method_idx == 3
-
-
-# ── parse_class_trait ──────────────────────────────────────────────────
-
-
-class TestParseClassTrait:
-    def test_basic_class_trait(self):
-        data = bytearray()
-        data += write_u30(1)            # name_mn
-        data += bytes([TRAIT_Class])    # kind
-        data += write_u30(2)            # slot_id
-        data += write_u30(3)            # class_index
-        name_mn, slot_id, class_idx = parse_class_trait(bytes(data))
-        assert name_mn == 1
-        assert slot_id == 2
-        assert class_idx == 3
+    def test_method_fields(self):
+        b = AbcBuilder()
+        name_str = b.string("doWork")
+        ns = b.package_namespace(0)
+        name_mn = b.qname(ns, name_str)
+        m_idx = b.method()
+        b.method_body(m_idx, code=b.asm(b.op_returnvoid()))
+        b.define_class(
+            name=name_mn, super_name=0,
+            instance_traits=[AbcBuilder.trait_method(name_mn, m_idx, disp_id=5)],
+        )
+        abc = parse_abc(serialize_abc(b.build()))
+        t = abc.instances[0].traits[0]
+        assert t.kind == TRAIT_Method
+        assert t.method_idx == m_idx
+        assert t.disp_id == 5
 
 
 # ── resolve_traits (integration via AbcBuilder) ────────────────────────

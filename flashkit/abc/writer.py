@@ -31,16 +31,61 @@ from .constants import (
     CONSTANT_Multiname, CONSTANT_MultinameA,
     CONSTANT_MultinameL, CONSTANT_MultinameLA,
     CONSTANT_TypeName,
+    TRAIT_Slot, TRAIT_Const, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
+    TRAIT_Class, TRAIT_Function,
+    ATTR_Metadata,
     METHOD_HasOptional, METHOD_HasParamNames,
     INSTANCE_ProtectedNs,
 )
 
 
+def _serialize_trait(t: TraitInfo) -> bytes:
+    """Serialize a single trait from its structured fields.
+
+    Used when a trait was created or mutated after parse and its ``_raw``
+    cache no longer matches the fields.
+    """
+    out = write_u30(t.name)
+    out += bytes([(t.kind & 0x0F) | ((t.attr & 0x0F) << 4)])
+
+    kind = t.kind
+    if kind in (TRAIT_Slot, TRAIT_Const):
+        out += write_u30(t.slot_id)
+        out += write_u30(t.type_name)
+        out += write_u30(t.vindex)
+        if t.vindex:
+            out += bytes([t.vkind & 0xFF])
+    elif kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
+        out += write_u30(t.disp_id)
+        out += write_u30(t.method_idx)
+    elif kind == TRAIT_Class:
+        out += write_u30(t.slot_id)
+        out += write_u30(t.class_idx)
+    elif kind == TRAIT_Function:
+        out += write_u30(t.slot_id)
+        out += write_u30(t.function_idx)
+
+    if t.attr & ATTR_Metadata:
+        out += write_u30(len(t.metadata))
+        for md_idx in t.metadata:
+            out += write_u30(md_idx)
+
+    return out
+
+
 def _write_traits(traits: list[TraitInfo]) -> bytes:
-    """Serialize a trait list using the raw binary data stored during parse."""
+    """Serialize a trait list.
+
+    Reuses the cached ``_raw`` bytes from parse for unmodified traits
+    (byte-perfect round-trip), otherwise re-serializes from the
+    structured fields.
+    """
     out = write_u30(len(traits))
     for t in traits:
-        out += t.data
+        if t._raw:
+            out += t._raw
+        else:
+            out += _serialize_trait(t)
     return out
 
 

@@ -149,6 +149,9 @@ def read_d64(data: bytes, offset: int) -> tuple[float, int]:
 def _read_traits(data: bytes, offset: int) -> tuple[list[TraitInfo], int]:
     """Read a traits_info array.
 
+    Populates the structured fields on TraitInfo and caches the original
+    bytes in ``_raw`` so the writer can reuse them when traits are unmodified.
+
     Returns:
         Tuple of (list of TraitInfo, new_offset).
     """
@@ -161,29 +164,32 @@ def _read_traits(data: bytes, offset: int) -> tuple[list[TraitInfo], int]:
         kind = kind_byte & 0x0F
         attr = (kind_byte >> 4) & 0x0F
 
+        trait = TraitInfo(name=name, kind=kind, attr=attr)
+
         if kind in (TRAIT_Slot, TRAIT_Const):
-            _slot_id, offset = read_u30(data, offset)
-            _type_name, offset = read_u30(data, offset)
-            vindex, offset = read_u30(data, offset)
-            if vindex:
-                _vkind, offset = read_u8(data, offset)
+            trait.slot_id, offset = read_u30(data, offset)
+            trait.type_name, offset = read_u30(data, offset)
+            trait.vindex, offset = read_u30(data, offset)
+            if trait.vindex:
+                trait.vkind, offset = read_u8(data, offset)
         elif kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
-            _disp_id, offset = read_u30(data, offset)
-            _method_idx, offset = read_u30(data, offset)
+            trait.disp_id, offset = read_u30(data, offset)
+            trait.method_idx, offset = read_u30(data, offset)
         elif kind == TRAIT_Class:
-            _slot_id, offset = read_u30(data, offset)
-            _class_idx, offset = read_u30(data, offset)
+            trait.slot_id, offset = read_u30(data, offset)
+            trait.class_idx, offset = read_u30(data, offset)
         elif kind == TRAIT_Function:
-            _slot_id, offset = read_u30(data, offset)
-            _func_idx, offset = read_u30(data, offset)
+            trait.slot_id, offset = read_u30(data, offset)
+            trait.function_idx, offset = read_u30(data, offset)
 
         if attr & ATTR_Metadata:
             md_count, offset = read_u30(data, offset)
             for _ in range(md_count):
-                _, offset = read_u30(data, offset)
+                md_idx, offset = read_u30(data, offset)
+                trait.metadata.append(md_idx)
 
-        raw = data[start:offset]
-        traits.append(TraitInfo(name=name, kind=kind, data=raw))
+        trait._raw = data[start:offset]
+        traits.append(trait)
 
     return traits, offset
 

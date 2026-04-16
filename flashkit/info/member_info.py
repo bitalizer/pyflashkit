@@ -241,54 +241,6 @@ class MethodInfoResolved:
         return self._fingerprint_cache
 
 
-def parse_slot_trait(data: bytes) -> tuple[int, int, int, int | None]:
-    """Parse a TRAIT_Slot or TRAIT_Const trait's raw data.
-
-    Args:
-        data: The raw TraitInfo.data bytes.
-
-    Returns:
-        Tuple of (name_mn, slot_id, type_mn, default_value_index).
-        default_value_index is None if no default.
-    """
-    off = 0
-    name_mn, off = read_u30(data, off)
-    _kind_byte, off = read_u8(data, off)
-    slot_id, off = read_u30(data, off)
-    type_mn, off = read_u30(data, off)
-    vindex, off = read_u30(data, off)
-    return (name_mn, slot_id, type_mn, vindex if vindex else None)
-
-
-def parse_method_trait(data: bytes) -> tuple[int, int, int]:
-    """Parse a TRAIT_Method, TRAIT_Getter, or TRAIT_Setter trait's raw data.
-
-    Args:
-        data: The raw TraitInfo.data bytes.
-
-    Returns:
-        Tuple of (name_mn, disp_id, method_index).
-    """
-    off = 0
-    name_mn, off = read_u30(data, off)
-    _kind_byte, off = read_u8(data, off)
-    disp_id, off = read_u30(data, off)
-    method_idx, off = read_u30(data, off)
-    return (name_mn, disp_id, method_idx)
-
-
-def parse_class_trait(data: bytes) -> tuple[int, int, int]:
-    """Parse a TRAIT_Class trait's raw data.
-
-    Returns:
-        Tuple of (name_mn, slot_id, class_index).
-    """
-    off = 0
-    name_mn, off = read_u30(data, off)
-    _kind_byte, off = read_u8(data, off)
-    slot_id, off = read_u30(data, off)
-    class_idx, off = read_u30(data, off)
-    return (name_mn, slot_id, class_idx)
 
 
 def resolve_traits(
@@ -314,22 +266,24 @@ def resolve_traits(
 
     for i, trait in enumerate(traits):
         if trait.kind in (TRAIT_Slot, TRAIT_Const):
-            name_mn, slot_id, type_mn, default_val = parse_slot_trait(trait.data)
+            name_mn = trait.name
             fi = FieldInfo(
                 name=resolve_multiname(abc, name_mn),
-                type_name=resolve_multiname(abc, type_mn),
+                type_name=resolve_multiname(abc, trait.type_name),
                 is_static=is_static,
                 is_const=(trait.kind == TRAIT_Const),
-                slot_id=slot_id,
-                default_value=default_val,
+                slot_id=trait.slot_id,
+                default_value=trait.vindex if trait.vindex else None,
                 trait_index=i,
                 multiname_index=name_mn,
-                type_multiname_index=type_mn,
+                type_multiname_index=trait.type_name,
             )
             fields.append(fi)
 
         elif trait.kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
-            name_mn, disp_id, method_idx = parse_method_trait(trait.data)
+            name_mn = trait.name
+            disp_id = trait.disp_id
+            method_idx = trait.method_idx
 
             # Resolve method signature
             param_types: list[str] = []

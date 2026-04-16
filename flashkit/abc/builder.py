@@ -451,16 +451,14 @@ class AbcBuilder:
         Returns:
             TraitInfo ready to attach to an instance or class.
         """
-        kind = TRAIT_Const if is_const else TRAIT_Slot
-        data = bytearray()
-        data += write_u30(name)
-        data += bytes([kind])
-        data += write_u30(slot_id)
-        data += write_u30(type_mn)
-        data += write_u30(default_value)
-        if default_value:
-            data += bytes([default_kind])
-        return TraitInfo(name=name, kind=kind, data=bytes(data))
+        return TraitInfo(
+            name=name,
+            kind=TRAIT_Const if is_const else TRAIT_Slot,
+            slot_id=slot_id,
+            type_name=type_mn,
+            vindex=default_value,
+            vkind=default_kind if default_value else -1,
+        )
 
     @staticmethod
     def trait_method(
@@ -482,13 +480,10 @@ class AbcBuilder:
         Returns:
             TraitInfo ready to attach.
         """
-        kind_byte = kind | (attrs << 4)
-        data = bytearray()
-        data += write_u30(name)
-        data += bytes([kind_byte])
-        data += write_u30(disp_id)
-        data += write_u30(method)
-        return TraitInfo(name=name, kind=kind, data=bytes(data))
+        return TraitInfo(
+            name=name, kind=kind, attr=attrs,
+            disp_id=disp_id, method_idx=method,
+        )
 
     @staticmethod
     def trait_class(name: int, class_index: int, slot_id: int = 0) -> TraitInfo:
@@ -502,12 +497,10 @@ class AbcBuilder:
         Returns:
             TraitInfo ready to attach to a script.
         """
-        data = bytearray()
-        data += write_u30(name)
-        data += bytes([TRAIT_Class])
-        data += write_u30(slot_id)
-        data += write_u30(class_index)
-        return TraitInfo(name=name, kind=TRAIT_Class, data=bytes(data))
+        return TraitInfo(
+            name=name, kind=TRAIT_Class,
+            slot_id=slot_id, class_idx=class_index,
+        )
 
     # ── Classes ────────────────────────────────────────────────────────
 

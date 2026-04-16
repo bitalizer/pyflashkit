@@ -109,22 +109,48 @@ class MetadataInfo:
 class TraitInfo:
     """A trait (field, method, getter, setter, class, or const) on a class or script.
 
-    Traits are stored with their raw binary data to guarantee perfect
-    round-trip serialization. The ``name`` and ``kind`` fields are parsed
-    for easy inspection, but the full trait data (including slot IDs,
-    type references, method indices, and metadata) is in ``data``.
+    Fields beyond ``name`` and ``kind`` are populated according to the trait kind:
 
-    To inspect trait contents beyond name/kind, use the trait resolution
-    utilities in ``flashkit.info``.
+    - Slot/Const: ``slot_id``, ``type_name``, ``vindex``, ``vkind``.
+      If ``vindex`` is 0 the trait has no default value and ``vkind`` is -1.
+    - Method/Getter/Setter: ``disp_id``, ``method_idx``.
+    - Class: ``slot_id``, ``class_idx``.
+    - Function: ``slot_id``, ``function_idx``.
+
+    The ``attr`` byte holds the ATTR_Final / ATTR_Override / ATTR_Metadata bits.
+    If ATTR_Metadata is set, ``metadata`` contains indices into ``AbcFile.metadata``.
+
+    ``_raw`` caches the original bytes of this trait entry for round-trip
+    fidelity. When the trait is unmodified the writer reuses it verbatim;
+    mutated traits are re-serialized from the structured fields.
 
     Attributes:
         name: Multiname index for the trait name.
         kind: Trait kind (TRAIT_Slot, TRAIT_Method, TRAIT_Getter, etc.).
-        data: Complete raw binary of this trait entry (includes name and kind bytes).
+        attr: Trait attribute bits (upper nibble of the kind byte).
+        slot_id: Slot/Const/Class/Function only. The slot id.
+        type_name: Slot/Const only. Multiname index of the field type.
+        vindex: Slot/Const only. Default value index (0 = no default).
+        vkind: Slot/Const only. Default value kind byte (-1 = no default).
+        method_idx: Method/Getter/Setter only. Index into AbcFile.methods.
+        disp_id: Method/Getter/Setter only. Dispatch id.
+        class_idx: Class only. Index into AbcFile.classes/instances.
+        function_idx: Function only. Index into AbcFile.methods.
+        metadata: Indices into AbcFile.metadata (empty unless ATTR_Metadata).
     """
     name: int
     kind: int
-    data: bytes
+    attr: int = 0
+    slot_id: int = 0
+    type_name: int = 0
+    vindex: int = 0
+    vkind: int = -1
+    method_idx: int = 0
+    disp_id: int = 0
+    class_idx: int = 0
+    function_idx: int = 0
+    metadata: list[int] = field(default_factory=list)
+    _raw: bytes = b""
 
 
 @dataclass(slots=True)
