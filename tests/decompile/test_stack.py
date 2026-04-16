@@ -182,6 +182,42 @@ def test_getlocal_n_pushes_local_identifier():
     assert _p(result.stack[0]) == "_loc1_"
 
 
+def test_getlocal_within_param_count_uses_arg_name():
+    # A method with 2 parameters: locals 1..2 are the parameters
+    # (_arg_1, _arg_2); local 3+ is a real local (_loc3_).
+    abc = _mk_abc()
+    sim = BlockStackSim(abc, param_count=2)
+
+    bb, _ = _block(bytes([OP_GETLOCAL_1]))
+    assert _p(sim.run(bb).stack[0]) == "_arg_1"
+
+    bb2, _ = _block(bytes([OP_GETLOCAL_2]))
+    assert _p(sim.run(bb2).stack[0]) == "_arg_2"
+
+    # getlocal reg=3 is past the parameter range — stays as _loc3_.
+    from flashkit.abc.opcodes import OP_GETLOCAL as _GL
+    bb3, _ = _block(bytes([_GL, 3]))
+    assert _p(sim.run(bb3).stack[0]) == "_loc3_"
+
+
+def test_local0_name_override_for_static_methods():
+    # Static methods have the class object in local 0, not `this`.
+    abc = _mk_abc()
+    sim = BlockStackSim(abc, local0_name="MyClass")
+    bb, _ = _block(bytes([OP_GETLOCAL_0]))
+    assert _p(sim.run(bb).stack[0]) == "MyClass"
+
+
+def test_setlocal_uses_arg_name_when_in_param_range():
+    abc = _mk_abc()
+    sim = BlockStackSim(abc, param_count=1)
+    # pushbyte 5; setlocal_1  -> _arg_1 = 5;
+    bb, _ = _block(bytes([OP_PUSHBYTE, 5, OP_SETLOCAL_1]))
+    result = sim.run(bb)
+    assert len(result.statements) == 1
+    assert _p(result.statements[0]) == "_arg_1 = 5;"
+
+
 def test_setlocal_pops_and_emits_assignment():
     # pushbyte 5; setlocal_2
     abc = _mk_abc()
@@ -295,6 +331,24 @@ def test_setproperty_emits_assignment_statement():
 
     assert len(result.statements) == 1
     assert _p(result.statements[0]) == "this.x = 5;"
+
+
+def test_findpropstrict_plus_setproperty_same_name_collapses():
+    # findpropstrict foo; pushbyte 5; setproperty foo
+    #   -> the findpropstrict "scope" push is the same identifier as
+    #   the setproperty target, so this should print as ``foo = 5;``
+    #   rather than ``foo.foo = 5;``.
+    abc = _mk_abc(multinames=["foo"])
+    bb, _ = _block(bytes([
+        OP_FINDPROPSTRICT, 1,
+        OP_PUSHBYTE, 5,
+        OP_SETPROPERTY, 1,
+    ]))
+
+    result = _sim(abc, bb)
+
+    assert len(result.statements) == 1
+    assert _p(result.statements[0]) == "foo = 5;"
 
 
 def test_getlex_builds_standalone_identifier():
