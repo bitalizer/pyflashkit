@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from ..abc.types import AbcFile
-from ..abc.constants import INSTANCE_Interface
+from ..abc.constants import INSTANCE_INTERFACE
 from .member_info import (
     FieldInfo, MethodInfoResolved,
     resolve_multiname, resolve_multiname_full, resolve_traits,
@@ -295,7 +295,7 @@ def build_class_info(abc: AbcFile, index: int,
         super_name=super_name,
         super_package=super_package,
         interfaces=iface_names,
-        is_interface=bool(inst.flags & INSTANCE_Interface),
+        is_interface=bool(inst.flags & INSTANCE_INTERFACE),
         is_sealed=bool(inst.flags & 0x01),
         is_final=bool(inst.flags & 0x02),
         fields=inst_fields,

@@ -7,7 +7,7 @@ import pytest
 
 from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.writer import serialize_abc
-from flashkit.abc.constants import TRAIT_Method
+from flashkit.abc.constants import TRAIT_METHOD
 from flashkit.swf.builder import SwfBuilder
 from flashkit.workspace import Workspace, Resource, load_swf
 from flashkit.errors import ResourceError, SWFParseError

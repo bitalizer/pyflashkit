@@ -20,13 +20,13 @@ from dataclasses import dataclass, field
 from ..abc.types import AbcFile, TraitInfo, MethodBodyInfo
 from ..abc.parser import read_u30, read_u8
 from ..abc.constants import (
-    TRAIT_Slot, TRAIT_Const, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
-    TRAIT_Class, TRAIT_Function,
-    CONSTANT_QName, CONSTANT_QNameA,
-    CONSTANT_RTQName, CONSTANT_RTQNameA,
-    CONSTANT_Multiname, CONSTANT_MultinameA,
-    CONSTANT_TypeName,
-    ATTR_Metadata,
+    TRAIT_SLOT, TRAIT_CONST, TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER,
+    TRAIT_CLASS, TRAIT_FUNCTION,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_TYPENAME,
+    ATTR_METADATA,
 )
 
 
@@ -46,16 +46,16 @@ def resolve_multiname(abc: AbcFile, index: int) -> str:
     if index == 0 or index >= len(abc.multiname_pool):
         return "*"
     mn = abc.multiname_pool[index]
-    if mn.kind in (CONSTANT_QName, CONSTANT_QNameA):
+    if mn.kind in (CONSTANT_QNAME, CONSTANT_QNAME_A):
         if 0 < mn.name < len(abc.string_pool):
             return abc.string_pool[mn.name]
-    elif mn.kind in (CONSTANT_RTQName, CONSTANT_RTQNameA):
+    elif mn.kind in (CONSTANT_RTQNAME, CONSTANT_RTQNAME_A):
         if 0 < mn.name < len(abc.string_pool):
             return abc.string_pool[mn.name]
-    elif mn.kind in (CONSTANT_Multiname, CONSTANT_MultinameA):
+    elif mn.kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
         if 0 < mn.name < len(abc.string_pool):
             return abc.string_pool[mn.name]
-    elif mn.kind == CONSTANT_TypeName:
+    elif mn.kind == CONSTANT_TYPENAME:
         # TypeName: mn.ns = base type multiname index, mn.name = param count
         # mn.data = serialized parameter multiname indices (u30 encoded)
         base = resolve_multiname(abc, mn.ns)
@@ -86,18 +86,18 @@ def resolve_multiname_full(abc: AbcFile, index: int) -> tuple[str, str]:
     mn = abc.multiname_pool[index]
     name = "*"
     package = ""
-    if mn.kind in (CONSTANT_QName, CONSTANT_QNameA):
+    if mn.kind in (CONSTANT_QNAME, CONSTANT_QNAME_A):
         if 0 < mn.name < len(abc.string_pool):
             name = abc.string_pool[mn.name]
         if 0 < mn.ns < len(abc.namespace_pool):
             ns = abc.namespace_pool[mn.ns]
             if 0 < ns.name < len(abc.string_pool):
                 package = abc.string_pool[ns.name]
-    elif mn.kind in (CONSTANT_RTQName, CONSTANT_RTQNameA,
-                     CONSTANT_Multiname, CONSTANT_MultinameA):
+    elif mn.kind in (CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+                     CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
         if 0 < mn.name < len(abc.string_pool):
             name = abc.string_pool[mn.name]
-    elif mn.kind == CONSTANT_TypeName:
+    elif mn.kind == CONSTANT_TYPENAME:
         # Delegate to resolve_multiname for the full "Base.<T>" string;
         # derive package from the base type multiname.
         name = resolve_multiname(abc, index)
@@ -114,7 +114,7 @@ class FieldInfo:
         name: Field name string.
         type_name: Type name string (``"*"`` if untyped).
         is_static: Whether this is a static field.
-        is_const: True for TRAIT_Const, False for TRAIT_Slot.
+        is_const: True for TRAIT_CONST, False for TRAIT_SLOT.
         slot_id: Slot index in the object's slot array.
         default_value: Default value if specified, else None.
         trait_index: Index of the original trait in the trait list.
@@ -265,13 +265,13 @@ def resolve_traits(
     methods: list[MethodInfoResolved] = []
 
     for i, trait in enumerate(traits):
-        if trait.kind in (TRAIT_Slot, TRAIT_Const):
+        if trait.kind in (TRAIT_SLOT, TRAIT_CONST):
             name_mn = trait.name
             fi = FieldInfo(
                 name=resolve_multiname(abc, name_mn),
                 type_name=resolve_multiname(abc, trait.type_name),
                 is_static=is_static,
-                is_const=(trait.kind == TRAIT_Const),
+                is_const=(trait.kind == TRAIT_CONST),
                 slot_id=trait.slot_id,
                 default_value=trait.vindex if trait.vindex else None,
                 trait_index=i,
@@ -280,7 +280,7 @@ def resolve_traits(
             )
             fields.append(fi)
 
-        elif trait.kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
+        elif trait.kind in (TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER):
             name_mn = trait.name
             disp_id = trait.disp_id
             method_idx = trait.method_idx
@@ -309,8 +309,8 @@ def resolve_traits(
                 param_types=param_types,
                 return_type=return_type,
                 is_static=is_static,
-                is_getter=(trait.kind == TRAIT_Getter),
-                is_setter=(trait.kind == TRAIT_Setter),
+                is_getter=(trait.kind == TRAIT_GETTER),
+                is_setter=(trait.kind == TRAIT_SETTER),
                 method_index=method_idx,
                 body_index=body_idx,
                 disp_id=disp_id,

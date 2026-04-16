@@ -7,7 +7,7 @@ from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.parser import parse_abc
 from flashkit.abc.writer import serialize_abc
 from flashkit.abc.disasm import decode_instructions
-from flashkit.abc.constants import TRAIT_Method, TRAIT_Getter, INSTANCE_Interface
+from flashkit.abc.constants import TRAIT_METHOD, TRAIT_GETTER, INSTANCE_INTERFACE
 from flashkit.swf.builder import SwfBuilder
 from flashkit.swf.parser import parse_swf
 from flashkit.info.class_info import build_all_classes
@@ -37,7 +37,7 @@ def _build_game_swf():
                   max_stack=0, local_count=1)
     b.define_class(
         name=idrawable_mn, super_name=obj_mn,
-        flags=INSTANCE_Interface,
+        flags=INSTANCE_INTERFACE,
         instance_traits=[
             b.trait_method(b.qname(priv, "draw"), draw_method),
         ],
@@ -68,7 +68,7 @@ def _build_game_swf():
         instance_traits=[
             b.trait_slot(hp_mn, type_mn=int_mn, slot_id=1),
             b.trait_slot(name_field_mn, type_mn=str_mn, slot_id=2),
-            b.trait_method(b.qname(priv, "getName"), get_name, kind=TRAIT_Getter),
+            b.trait_method(b.qname(priv, "getName"), get_name, kind=TRAIT_GETTER),
             b.trait_method(b.qname(priv, "update"), update_method),
         ],
         interfaces=[idrawable_mn],

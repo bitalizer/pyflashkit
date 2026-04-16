@@ -29,17 +29,17 @@ from .types import (
     ClassInfo, ScriptInfo, ExceptionInfo, MethodBodyInfo,
 )
 from .constants import (
-    CONSTANT_QName, CONSTANT_QNameA,
-    CONSTANT_RTQName, CONSTANT_RTQNameA,
-    CONSTANT_RTQNameL, CONSTANT_RTQNameLA,
-    CONSTANT_Multiname, CONSTANT_MultinameA,
-    CONSTANT_MultinameL, CONSTANT_MultinameLA,
-    CONSTANT_TypeName,
-    TRAIT_Slot, TRAIT_Const, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
-    TRAIT_Class, TRAIT_Function,
-    ATTR_Metadata,
-    METHOD_HasOptional, METHOD_HasParamNames,
-    INSTANCE_ProtectedNs,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+    CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+    CONSTANT_TYPENAME,
+    TRAIT_SLOT, TRAIT_CONST, TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER,
+    TRAIT_CLASS, TRAIT_FUNCTION,
+    ATTR_METADATA,
+    METHOD_HAS_OPTIONAL, METHOD_HAS_PARAM_NAMES,
+    INSTANCE_PROTECTED_NS,
 )
 
 
@@ -166,23 +166,23 @@ def _read_traits(data: bytes, offset: int) -> tuple[list[TraitInfo], int]:
 
         trait = TraitInfo(name=name, kind=kind, attr=attr)
 
-        if kind in (TRAIT_Slot, TRAIT_Const):
+        if kind in (TRAIT_SLOT, TRAIT_CONST):
             trait.slot_id, offset = read_u30(data, offset)
             trait.type_name, offset = read_u30(data, offset)
             trait.vindex, offset = read_u30(data, offset)
             if trait.vindex:
                 trait.vkind, offset = read_u8(data, offset)
-        elif kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
+        elif kind in (TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER):
             trait.disp_id, offset = read_u30(data, offset)
             trait.method_idx, offset = read_u30(data, offset)
-        elif kind == TRAIT_Class:
+        elif kind == TRAIT_CLASS:
             trait.slot_id, offset = read_u30(data, offset)
             trait.class_idx, offset = read_u30(data, offset)
-        elif kind == TRAIT_Function:
+        elif kind == TRAIT_FUNCTION:
             trait.slot_id, offset = read_u30(data, offset)
             trait.function_idx, offset = read_u30(data, offset)
 
-        if attr & ATTR_Metadata:
+        if attr & ATTR_METADATA:
             md_count, offset = read_u30(data, offset)
             for _ in range(md_count):
                 md_idx, offset = read_u30(data, offset)
@@ -297,19 +297,19 @@ def _parse_abc_inner(data: bytes) -> AbcFile:
     for _ in range(max(0, count - 1)):
         kind, off = read_u8(data, off)
         mn = MultinameInfo(kind=kind)
-        if kind in (CONSTANT_QName, CONSTANT_QNameA):
+        if kind in (CONSTANT_QNAME, CONSTANT_QNAME_A):
             mn.ns, off = read_u30(data, off)
             mn.name, off = read_u30(data, off)
-        elif kind in (CONSTANT_RTQName, CONSTANT_RTQNameA):
+        elif kind in (CONSTANT_RTQNAME, CONSTANT_RTQNAME_A):
             mn.name, off = read_u30(data, off)
-        elif kind in (CONSTANT_RTQNameL, CONSTANT_RTQNameLA):
+        elif kind in (CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA):
             pass
-        elif kind in (CONSTANT_Multiname, CONSTANT_MultinameA):
+        elif kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
             mn.name, off = read_u30(data, off)
             mn.ns_set, off = read_u30(data, off)
-        elif kind in (CONSTANT_MultinameL, CONSTANT_MultinameLA):
+        elif kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA):
             mn.ns_set, off = read_u30(data, off)
-        elif kind == CONSTANT_TypeName:
+        elif kind == CONSTANT_TYPENAME:
             mn.ns, off = read_u30(data, off)  # base type multiname index
             param_count, off = read_u30(data, off)
             params = []
@@ -344,14 +344,14 @@ def _parse_abc_inner(data: bytes) -> AbcFile:
             param_count=param_count, return_type=return_type,
             param_types=param_types, name=name, flags=flags)
 
-        if flags & METHOD_HasOptional:
+        if flags & METHOD_HAS_OPTIONAL:
             opt_count, off = read_u30(data, off)
             for __ in range(opt_count):
                 val, off = read_u30(data, off)
                 vkind, off = read_u8(data, off)
                 mi.options.append((val, vkind))
 
-        if flags & METHOD_HasParamNames:
+        if flags & METHOD_HAS_PARAM_NAMES:
             for __ in range(param_count):
                 pn, off = read_u30(data, off)
                 mi.param_names.append(pn)
@@ -380,7 +380,7 @@ def _parse_abc_inner(data: bytes) -> AbcFile:
         inst.super_name, off = read_u30(data, off)
         inst.flags, off = read_u8(data, off)
 
-        if inst.flags & INSTANCE_ProtectedNs:
+        if inst.flags & INSTANCE_PROTECTED_NS:
             inst.protectedNs, off = read_u30(data, off)
 
         iface_count, off = read_u30(data, off)

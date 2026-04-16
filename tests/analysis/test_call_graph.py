@@ -5,7 +5,7 @@ import pytest
 from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.parser import parse_abc
 from flashkit.abc.writer import serialize_abc
-from flashkit.abc.constants import TRAIT_Method
+from flashkit.abc.constants import TRAIT_METHOD
 from flashkit.info.class_info import build_all_classes
 from flashkit.analysis.call_graph import CallGraph
 

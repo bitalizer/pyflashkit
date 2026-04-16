@@ -21,7 +21,7 @@ class NamespaceInfo:
     """A namespace entry in the constant pool.
 
     Attributes:
-        kind: Namespace kind constant (CONSTANT_Namespace, CONSTANT_PackageNamespace, etc.).
+        kind: Namespace kind constant (CONSTANT_NAMESPACE, CONSTANT_PACKAGE_NAMESPACE, etc.).
         name: Index into the string pool for the namespace name.
     """
     kind: int
@@ -58,7 +58,7 @@ class MultinameInfo:
       for round-trip fidelity — a future version may add dedicated fields.
 
     Attributes:
-        kind: Multiname kind constant (CONSTANT_QName, etc.).
+        kind: Multiname kind constant (CONSTANT_QNAME, etc.).
         data: Raw serialized parameter bytes (TypeName only).
         ns:   Namespace index, or base type index for TypeName.
         name: String index, or parameter count for TypeName.
@@ -117,8 +117,8 @@ class TraitInfo:
     - Class: ``slot_id``, ``class_idx``.
     - Function: ``slot_id``, ``function_idx``.
 
-    The ``attr`` byte holds the ATTR_Final / ATTR_Override / ATTR_Metadata bits.
-    If ATTR_Metadata is set, ``metadata`` contains indices into ``AbcFile.metadata``.
+    The ``attr`` byte holds the ATTR_FINAL / ATTR_OVERRIDE / ATTR_METADATA bits.
+    If ATTR_METADATA is set, ``metadata`` contains indices into ``AbcFile.metadata``.
 
     ``_raw`` caches the original bytes of this trait entry for round-trip
     fidelity. When the trait is unmodified the writer reuses it verbatim;
@@ -126,7 +126,7 @@ class TraitInfo:
 
     Attributes:
         name: Multiname index for the trait name.
-        kind: Trait kind (TRAIT_Slot, TRAIT_Method, TRAIT_Getter, etc.).
+        kind: Trait kind (TRAIT_SLOT, TRAIT_METHOD, TRAIT_GETTER, etc.).
         attr: Trait attribute bits (upper nibble of the kind byte).
         slot_id: Slot/Const/Class/Function only. The slot id.
         type_name: Slot/Const only. Multiname index of the field type.
@@ -136,7 +136,7 @@ class TraitInfo:
         disp_id: Method/Getter/Setter only. Dispatch id.
         class_idx: Class only. Index into AbcFile.classes/instances.
         function_idx: Function only. Index into AbcFile.methods.
-        metadata: Indices into AbcFile.metadata (empty unless ATTR_Metadata).
+        metadata: Indices into AbcFile.metadata (empty unless ATTR_METADATA).
     """
     name: int
     kind: int

@@ -7,10 +7,10 @@ from pathlib import Path
 from flashkit.abc.parser import parse_abc, write_u30, write_s32
 from flashkit.abc.types import AbcFile
 from flashkit.abc.constants import (
-    CONSTANT_QName, CONSTANT_PackageNamespace, CONSTANT_PrivateNs,
-    TRAIT_Slot, TRAIT_Method, TRAIT_Const,
-    INSTANCE_Sealed,
-    METHOD_HasParamNames,
+    CONSTANT_QNAME, CONSTANT_PACKAGE_NAMESPACE, CONSTANT_PRIVATE_NS,
+    TRAIT_SLOT, TRAIT_METHOD, TRAIT_CONST,
+    INSTANCE_SEALED,
+    METHOD_HAS_PARAM_NAMES,
 )
 
 
@@ -67,10 +67,10 @@ def build_abc_bytes(
         # namespace pool: [default, package "com.test", private ""]
         out += write_u30(3)
         # ns[1] = PackageNamespace("com.test")
-        out += bytes([CONSTANT_PackageNamespace])
+        out += bytes([CONSTANT_PACKAGE_NAMESPACE])
         out += write_u30(sidx("com.test"))
         # ns[2] = PrivateNs("")
-        out += bytes([CONSTANT_PrivateNs])
+        out += bytes([CONSTANT_PRIVATE_NS])
         out += write_u30(sidx(""))
 
         # ns_set pool — empty
@@ -91,7 +91,7 @@ def build_abc_bytes(
         ]
         out += write_u30(len(mn_entries) + 1)
         for ns_idx, name in mn_entries:
-            out += bytes([CONSTANT_QName])
+            out += bytes([CONSTANT_QNAME])
             out += write_u30(ns_idx)
             out += write_u30(sidx(name))
 
@@ -109,7 +109,7 @@ def build_abc_bytes(
         out += write_u30(6)   # return_type = mn[6] = void
         out += write_u30(7)   # param_types[0] = mn[7] = String
         out += write_u30(0)   # name
-        out += bytes([METHOD_HasParamNames])  # flags
+        out += bytes([METHOD_HAS_PARAM_NAMES])  # flags
         out += write_u30(sidx("arg0"))  # param_names[0]
 
         # method[2]: static init () -> *
@@ -126,23 +126,23 @@ def build_abc_bytes(
         # instance[0]:
         out += write_u30(1)          # name = mn[1] = TestClass
         out += write_u30(2)          # super_name = mn[2] = Object
-        out += bytes([INSTANCE_Sealed])  # flags
+        out += bytes([INSTANCE_SEALED])  # flags
         out += write_u30(0)          # interface count
         out += write_u30(0)          # iinit = method[0]
 
         # instance traits: 1 field + 1 method
         out += write_u30(2)  # trait count
 
-        # trait[0]: field myField:int (TRAIT_Slot)
+        # trait[0]: field myField:int (TRAIT_SLOT)
         out += write_u30(3)              # name = mn[3] = myField
-        out += bytes([TRAIT_Slot])       # kind
+        out += bytes([TRAIT_SLOT])       # kind
         out += write_u30(1)              # slot_id
         out += write_u30(4)              # type = mn[4] = int
         out += write_u30(0)              # vindex (no default)
 
-        # trait[1]: method doStuff (TRAIT_Method)
+        # trait[1]: method doStuff (TRAIT_METHOD)
         out += write_u30(5)              # name = mn[5] = doStuff
-        out += bytes([TRAIT_Method])     # kind
+        out += bytes([TRAIT_METHOD])     # kind
         out += write_u30(0)              # disp_id
         out += write_u30(1)              # method = method[1]
 

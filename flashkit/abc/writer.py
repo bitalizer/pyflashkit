@@ -25,17 +25,17 @@ from ..errors import SerializeError
 from .types import AbcFile, TraitInfo
 from .parser import write_u30, write_s32
 from .constants import (
-    CONSTANT_QName, CONSTANT_QNameA,
-    CONSTANT_RTQName, CONSTANT_RTQNameA,
-    CONSTANT_RTQNameL, CONSTANT_RTQNameLA,
-    CONSTANT_Multiname, CONSTANT_MultinameA,
-    CONSTANT_MultinameL, CONSTANT_MultinameLA,
-    CONSTANT_TypeName,
-    TRAIT_Slot, TRAIT_Const, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
-    TRAIT_Class, TRAIT_Function,
-    ATTR_Metadata,
-    METHOD_HasOptional, METHOD_HasParamNames,
-    INSTANCE_ProtectedNs,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+    CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+    CONSTANT_TYPENAME,
+    TRAIT_SLOT, TRAIT_CONST, TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER,
+    TRAIT_CLASS, TRAIT_FUNCTION,
+    ATTR_METADATA,
+    METHOD_HAS_OPTIONAL, METHOD_HAS_PARAM_NAMES,
+    INSTANCE_PROTECTED_NS,
 )
 
 
@@ -49,23 +49,23 @@ def _serialize_trait(t: TraitInfo) -> bytes:
     out += bytes([(t.kind & 0x0F) | ((t.attr & 0x0F) << 4)])
 
     kind = t.kind
-    if kind in (TRAIT_Slot, TRAIT_Const):
+    if kind in (TRAIT_SLOT, TRAIT_CONST):
         out += write_u30(t.slot_id)
         out += write_u30(t.type_name)
         out += write_u30(t.vindex)
         if t.vindex:
             out += bytes([t.vkind & 0xFF])
-    elif kind in (TRAIT_Method, TRAIT_Getter, TRAIT_Setter):
+    elif kind in (TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER):
         out += write_u30(t.disp_id)
         out += write_u30(t.method_idx)
-    elif kind == TRAIT_Class:
+    elif kind == TRAIT_CLASS:
         out += write_u30(t.slot_id)
         out += write_u30(t.class_idx)
-    elif kind == TRAIT_Function:
+    elif kind == TRAIT_FUNCTION:
         out += write_u30(t.slot_id)
         out += write_u30(t.function_idx)
 
-    if t.attr & ATTR_Metadata:
+    if t.attr & ATTR_METADATA:
         out += write_u30(len(t.metadata))
         for md_idx in t.metadata:
             out += write_u30(md_idx)
@@ -175,19 +175,19 @@ def _serialize_abc_inner(abc: AbcFile) -> bytes:
     out += write_u30(len(mn_extra) + 1 if mn_extra else 0)
     for mn in mn_extra:
         out += bytes([mn.kind])
-        if mn.kind in (CONSTANT_QName, CONSTANT_QNameA):
+        if mn.kind in (CONSTANT_QNAME, CONSTANT_QNAME_A):
             out += write_u30(mn.ns)
             out += write_u30(mn.name)
-        elif mn.kind in (CONSTANT_RTQName, CONSTANT_RTQNameA):
+        elif mn.kind in (CONSTANT_RTQNAME, CONSTANT_RTQNAME_A):
             out += write_u30(mn.name)
-        elif mn.kind in (CONSTANT_RTQNameL, CONSTANT_RTQNameLA):
+        elif mn.kind in (CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA):
             pass
-        elif mn.kind in (CONSTANT_Multiname, CONSTANT_MultinameA):
+        elif mn.kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
             out += write_u30(mn.name)
             out += write_u30(mn.ns_set)
-        elif mn.kind in (CONSTANT_MultinameL, CONSTANT_MultinameLA):
+        elif mn.kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA):
             out += write_u30(mn.ns_set)
-        elif mn.kind == CONSTANT_TypeName:
+        elif mn.kind == CONSTANT_TYPENAME:
             out += write_u30(mn.ns)    # base type multiname index
             out += write_u30(mn.name)  # parameter count
             out += mn.data             # pre-serialized parameter u30s
@@ -206,13 +206,13 @@ def _serialize_abc_inner(abc: AbcFile) -> bytes:
         out += write_u30(mi.name)
         out += bytes([mi.flags])
 
-        if mi.flags & METHOD_HasOptional:
+        if mi.flags & METHOD_HAS_OPTIONAL:
             out += write_u30(len(mi.options))
             for val, vkind in mi.options:
                 out += write_u30(val)
                 out += bytes([vkind])
 
-        if mi.flags & METHOD_HasParamNames:
+        if mi.flags & METHOD_HAS_PARAM_NAMES:
             for pn in mi.param_names:
                 out += write_u30(pn)
 
@@ -233,7 +233,7 @@ def _serialize_abc_inner(abc: AbcFile) -> bytes:
         out += write_u30(inst.name)
         out += write_u30(inst.super_name)
         out += bytes([inst.flags])
-        if inst.flags & INSTANCE_ProtectedNs:
+        if inst.flags & INSTANCE_PROTECTED_NS:
             out += write_u30(inst.protectedNs)
         out += write_u30(len(inst.interfaces))
         for ifc in inst.interfaces:

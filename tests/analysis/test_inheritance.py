@@ -5,7 +5,7 @@ import pytest
 from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.parser import parse_abc
 from flashkit.abc.writer import serialize_abc
-from flashkit.abc.constants import INSTANCE_Interface
+from flashkit.abc.constants import INSTANCE_INTERFACE
 from flashkit.info.class_info import build_all_classes
 from flashkit.analysis.inheritance import InheritanceGraph
 
@@ -45,7 +45,7 @@ def _build_classes(defs):
             iface_mns.append(b.qname(pub, iface))
 
         import flashkit.abc.constants as c
-        flags = c.INSTANCE_Interface if is_iface else c.INSTANCE_Sealed
+        flags = c.INSTANCE_INTERFACE if is_iface else c.INSTANCE_SEALED
 
         b.define_class(name=cls_mn, super_name=super_mn, flags=flags,
                        interfaces=iface_mns)

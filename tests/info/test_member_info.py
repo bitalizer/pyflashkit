@@ -7,12 +7,12 @@ from flashkit.abc.parser import parse_abc, write_u30
 from flashkit.abc.writer import serialize_abc
 from flashkit.abc.types import AbcFile, MultinameInfo, NamespaceInfo, MethodBodyInfo, TraitInfo
 from flashkit.abc.constants import (
-    CONSTANT_QName, CONSTANT_QNameA,
-    CONSTANT_RTQName, CONSTANT_RTQNameA,
-    CONSTANT_Multiname, CONSTANT_MultinameA,
-    CONSTANT_TypeName,
-    TRAIT_Slot, TRAIT_Const, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
-    TRAIT_Class,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_TYPENAME,
+    TRAIT_SLOT, TRAIT_CONST, TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER,
+    TRAIT_CLASS,
 )
 from flashkit.info.member_info import (
     resolve_multiname,
@@ -73,56 +73,56 @@ class TestResolveMultiname:
     def test_qname(self):
         abc = _abc_with_strings_and_multinames(
             strings=["MyClass"],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=0, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1)],
         )
         assert resolve_multiname(abc, 1) == "MyClass"
 
     def test_qname_a(self):
         abc = _abc_with_strings_and_multinames(
             strings=["attr"],
-            multinames=[MultinameInfo(kind=CONSTANT_QNameA, ns=0, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME_A, ns=0, name=1)],
         )
         assert resolve_multiname(abc, 1) == "attr"
 
     def test_rtqname(self):
         abc = _abc_with_strings_and_multinames(
             strings=["dynName"],
-            multinames=[MultinameInfo(kind=CONSTANT_RTQName, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_RTQNAME, name=1)],
         )
         assert resolve_multiname(abc, 1) == "dynName"
 
     def test_rtqname_a(self):
         abc = _abc_with_strings_and_multinames(
             strings=["dynAttr"],
-            multinames=[MultinameInfo(kind=CONSTANT_RTQNameA, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_RTQNAME_A, name=1)],
         )
         assert resolve_multiname(abc, 1) == "dynAttr"
 
     def test_multiname(self):
         abc = _abc_with_strings_and_multinames(
             strings=["multi"],
-            multinames=[MultinameInfo(kind=CONSTANT_Multiname, name=1, ns_set=0)],
+            multinames=[MultinameInfo(kind=CONSTANT_MULTINAME, name=1, ns_set=0)],
         )
         assert resolve_multiname(abc, 1) == "multi"
 
     def test_multiname_a(self):
         abc = _abc_with_strings_and_multinames(
             strings=["multiA"],
-            multinames=[MultinameInfo(kind=CONSTANT_MultinameA, name=1, ns_set=0)],
+            multinames=[MultinameInfo(kind=CONSTANT_MULTINAME_A, name=1, ns_set=0)],
         )
         assert resolve_multiname(abc, 1) == "multiA"
 
     def test_qname_with_zero_name_returns_fallback(self):
         abc = _abc_with_strings_and_multinames(
             strings=["unused"],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=0, name=0)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=0)],
         )
         assert resolve_multiname(abc, 1) == "multiname[1]"
 
     def test_qname_with_name_out_of_range_returns_fallback(self):
         abc = _abc_with_strings_and_multinames(
             strings=["only"],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=0, name=99)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=99)],
         )
         assert resolve_multiname(abc, 1) == "multiname[1]"
 
@@ -132,9 +132,9 @@ class TestResolveMultiname:
         abc = _abc_with_strings_and_multinames(
             strings=["Vector", "int"],
             multinames=[
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=1),   # mn[1] = Vector
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=2),   # mn[2] = int
-                MultinameInfo(kind=CONSTANT_TypeName, ns=1, name=1, data=param_data),  # mn[3] = Vector.<int>
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1),   # mn[1] = Vector
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=2),   # mn[2] = int
+                MultinameInfo(kind=CONSTANT_TYPENAME, ns=1, name=1, data=param_data),  # mn[3] = Vector.<int>
             ],
         )
         assert resolve_multiname(abc, 3) == "Vector.<int>"
@@ -145,10 +145,10 @@ class TestResolveMultiname:
         abc = _abc_with_strings_and_multinames(
             strings=["Map", "String", "int"],
             multinames=[
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=1),   # mn[1] = Map
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=2),   # mn[2] = String
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=3),   # mn[3] = int
-                MultinameInfo(kind=CONSTANT_TypeName, ns=1, name=2, data=param_data),  # mn[4]
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1),   # mn[1] = Map
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=2),   # mn[2] = String
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=3),   # mn[3] = int
+                MultinameInfo(kind=CONSTANT_TYPENAME, ns=1, name=2, data=param_data),  # mn[4]
             ],
         )
         assert resolve_multiname(abc, 4) == "Map.<String, int>"
@@ -158,8 +158,8 @@ class TestResolveMultiname:
         abc = _abc_with_strings_and_multinames(
             strings=["Base"],
             multinames=[
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=1),   # mn[1] = Base
-                MultinameInfo(kind=CONSTANT_TypeName, ns=1, name=0, data=b""),  # mn[2]
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1),   # mn[1] = Base
+                MultinameInfo(kind=CONSTANT_TYPENAME, ns=1, name=0, data=b""),  # mn[2]
             ],
         )
         assert resolve_multiname(abc, 2) == "Base"
@@ -178,21 +178,21 @@ class TestResolveMultinameFull:
         assert resolve_multiname_full(abc, 999) == ("", "*")
 
     def test_qname_with_package(self):
-        from flashkit.abc.constants import CONSTANT_PackageNamespace
+        from flashkit.abc.constants import CONSTANT_PACKAGE_NAMESPACE
         abc = _abc_with_strings_and_multinames(
             strings=["com.example", "Player"],
             namespace_pool=[
                 NamespaceInfo(kind=0, name=0),  # ns[0] default
-                NamespaceInfo(kind=CONSTANT_PackageNamespace, name=1),  # ns[1] = "com.example"
+                NamespaceInfo(kind=CONSTANT_PACKAGE_NAMESPACE, name=1),  # ns[1] = "com.example"
             ],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=1, name=2)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=1, name=2)],
         )
         assert resolve_multiname_full(abc, 1) == ("com.example", "Player")
 
     def test_qname_no_package(self):
         abc = _abc_with_strings_and_multinames(
             strings=["Object"],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=0, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1)],
         )
         pkg, name = resolve_multiname_full(abc, 1)
         assert name == "Object"
@@ -201,7 +201,7 @@ class TestResolveMultinameFull:
     def test_rtqname_has_no_package(self):
         abc = _abc_with_strings_and_multinames(
             strings=["dynName"],
-            multinames=[MultinameInfo(kind=CONSTANT_RTQName, name=1)],
+            multinames=[MultinameInfo(kind=CONSTANT_RTQNAME, name=1)],
         )
         pkg, name = resolve_multiname_full(abc, 1)
         assert name == "dynName"
@@ -210,7 +210,7 @@ class TestResolveMultinameFull:
     def test_multiname_has_no_package(self):
         abc = _abc_with_strings_and_multinames(
             strings=["multi"],
-            multinames=[MultinameInfo(kind=CONSTANT_Multiname, name=1, ns_set=0)],
+            multinames=[MultinameInfo(kind=CONSTANT_MULTINAME, name=1, ns_set=0)],
         )
         pkg, name = resolve_multiname_full(abc, 1)
         assert name == "multi"
@@ -219,24 +219,24 @@ class TestResolveMultinameFull:
     def test_qname_zero_name_returns_star(self):
         abc = _abc_with_strings_and_multinames(
             strings=["unused"],
-            multinames=[MultinameInfo(kind=CONSTANT_QName, ns=0, name=0)],
+            multinames=[MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=0)],
         )
         _, name = resolve_multiname_full(abc, 1)
         assert name == "*"
 
     def test_typename_returns_full_name_and_base_package(self):
-        from flashkit.abc.constants import CONSTANT_PackageNamespace
+        from flashkit.abc.constants import CONSTANT_PACKAGE_NAMESPACE
         param_data = bytes(write_u30(2))  # param index = mn[2] = "int"
         abc = _abc_with_strings_and_multinames(
             strings=["__AS3__.vec", "Vector", "int"],
             namespace_pool=[
                 NamespaceInfo(kind=0, name=0),
-                NamespaceInfo(kind=CONSTANT_PackageNamespace, name=1),  # ns[1] = "__AS3__.vec"
+                NamespaceInfo(kind=CONSTANT_PACKAGE_NAMESPACE, name=1),  # ns[1] = "__AS3__.vec"
             ],
             multinames=[
-                MultinameInfo(kind=CONSTANT_QName, ns=1, name=2),   # mn[1] = Vector (in __AS3__.vec)
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=3),   # mn[2] = int
-                MultinameInfo(kind=CONSTANT_TypeName, ns=1, name=1, data=param_data),  # mn[3]
+                MultinameInfo(kind=CONSTANT_QNAME, ns=1, name=2),   # mn[1] = Vector (in __AS3__.vec)
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=3),   # mn[2] = int
+                MultinameInfo(kind=CONSTANT_TYPENAME, ns=1, name=1, data=param_data),  # mn[3]
             ],
         )
         pkg, name = resolve_multiname_full(abc, 3)
@@ -247,8 +247,8 @@ class TestResolveMultinameFull:
         abc = _abc_with_strings_and_multinames(
             strings=["Base"],
             multinames=[
-                MultinameInfo(kind=CONSTANT_QName, ns=0, name=1),   # mn[1] = Base
-                MultinameInfo(kind=CONSTANT_TypeName, ns=1, name=0, data=b""),  # mn[2]
+                MultinameInfo(kind=CONSTANT_QNAME, ns=0, name=1),   # mn[1] = Base
+                MultinameInfo(kind=CONSTANT_TYPENAME, ns=1, name=0, data=b""),  # mn[2]
             ],
         )
         pkg, name = resolve_multiname_full(abc, 2)
@@ -276,7 +276,7 @@ class TestTraitInfoFields:
         )
         abc = parse_abc(serialize_abc(b.build()))
         t = abc.instances[0].traits[0]
-        assert t.kind == TRAIT_Slot
+        assert t.kind == TRAIT_SLOT
         assert t.name == name_mn
         assert t.slot_id == 3
         assert t.type_name == type_mn
@@ -295,7 +295,7 @@ class TestTraitInfoFields:
         )
         abc = parse_abc(serialize_abc(b.build()))
         t = abc.instances[0].traits[0]
-        assert t.kind == TRAIT_Method
+        assert t.kind == TRAIT_METHOD
         assert t.method_idx == m_idx
         assert t.disp_id == 5
 
@@ -354,7 +354,7 @@ class TestResolveTraits:
         assert fields[0].is_const is True
 
     def test_resolve_method(self):
-        abc = self._build_abc_with_traits(methods=[("attack", "void", ["int"], TRAIT_Method)])
+        abc = self._build_abc_with_traits(methods=[("attack", "void", ["int"], TRAIT_METHOD)])
         body_map = build_method_body_map(abc)
         _, methods = resolve_traits(abc, abc.instances[0].traits, method_body_map=body_map)
         assert len(methods) == 1
@@ -366,8 +366,8 @@ class TestResolveTraits:
 
     def test_resolve_getter_setter(self):
         abc = self._build_abc_with_traits(methods=[
-            ("hp", "int", [], TRAIT_Getter),
-            ("hp", "void", ["int"], TRAIT_Setter),
+            ("hp", "int", [], TRAIT_GETTER),
+            ("hp", "void", ["int"], TRAIT_SETTER),
         ])
         body_map = build_method_body_map(abc)
         _, methods = resolve_traits(abc, abc.instances[0].traits, method_body_map=body_map)
@@ -384,7 +384,7 @@ class TestResolveTraits:
         assert fields[0].is_static is True
 
     def test_resolve_method_body_index(self):
-        abc = self._build_abc_with_traits(methods=[("run", "void", [], TRAIT_Method)])
+        abc = self._build_abc_with_traits(methods=[("run", "void", [], TRAIT_METHOD)])
         body_map = build_method_body_map(abc)
         _, methods = resolve_traits(abc, abc.instances[0].traits, method_body_map=body_map)
         assert methods[0].body_index >= 0
@@ -392,7 +392,7 @@ class TestResolveTraits:
     def test_mixed_fields_and_methods(self):
         abc = self._build_abc_with_traits(
             fields=[("x", "Number", False), ("y", "Number", False)],
-            methods=[("move", "void", ["Number", "Number"], TRAIT_Method)],
+            methods=[("move", "void", ["Number", "Number"], TRAIT_METHOD)],
         )
         body_map = build_method_body_map(abc)
         fields, methods = resolve_traits(abc, abc.instances[0].traits, method_body_map=body_map)

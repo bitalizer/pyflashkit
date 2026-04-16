@@ -5,7 +5,7 @@ import pytest
 from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.parser import parse_abc
 from flashkit.abc.writer import serialize_abc
-from flashkit.abc.constants import TRAIT_Getter, TRAIT_Setter, INSTANCE_Interface
+from flashkit.abc.constants import TRAIT_GETTER, TRAIT_SETTER, INSTANCE_INTERFACE
 from flashkit.info.class_info import build_all_classes, build_class_info
 
 
@@ -45,9 +45,9 @@ def _build_single_class(name="MyClass", package="com.test",
     import flashkit.abc.constants as c
     flags = 0
     if is_interface:
-        flags = c.INSTANCE_Interface
+        flags = c.INSTANCE_INTERFACE
     else:
-        flags = c.INSTANCE_Sealed
+        flags = c.INSTANCE_SEALED
 
     b.define_class(
         name=cls_mn, super_name=obj_mn, flags=flags,
@@ -86,9 +86,9 @@ class TestBuildClassInfo:
         assert ci.fields[1].type_name == "String"
 
     def test_methods_resolved(self):
-        from flashkit.abc.constants import TRAIT_Method
+        from flashkit.abc.constants import TRAIT_METHOD
         classes = _build_single_class(
-            methods=[("attack", "void", ["int"], TRAIT_Method)])
+            methods=[("attack", "void", ["int"], TRAIT_METHOD)])
         ci = classes[0]
         assert len(ci.methods) == 1
         assert ci.methods[0].name == "attack"
@@ -98,8 +98,8 @@ class TestBuildClassInfo:
     def test_getter_setter(self):
         classes = _build_single_class(
             methods=[
-                ("hp", "int", [], TRAIT_Getter),
-                ("hp", "void", ["int"], TRAIT_Setter),
+                ("hp", "int", [], TRAIT_GETTER),
+                ("hp", "void", ["int"], TRAIT_SETTER),
             ])
         ci = classes[0]
         getters = [m for m in ci.methods if m.is_getter]
@@ -121,9 +121,9 @@ class TestBuildClassInfo:
         assert ci.get_field("nonexistent") is None
 
     def test_get_method(self):
-        from flashkit.abc.constants import TRAIT_Method
+        from flashkit.abc.constants import TRAIT_METHOD
         classes = _build_single_class(
-            methods=[("run", "void", [], TRAIT_Method)])
+            methods=[("run", "void", [], TRAIT_METHOD)])
         ci = classes[0]
         m = ci.get_method("run")
         assert m is not None

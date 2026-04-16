@@ -6,10 +6,10 @@ from flashkit.abc.builder import AbcBuilder
 from flashkit.abc.parser import parse_abc
 from flashkit.abc.writer import serialize_abc
 from flashkit.abc.constants import (
-    CONSTANT_QName, CONSTANT_PackageNamespace, CONSTANT_PrivateNs,
-    TRAIT_Slot, TRAIT_Method, TRAIT_Const, TRAIT_Getter, TRAIT_Class,
-    INSTANCE_Sealed, INSTANCE_Final,
-    ATTR_Override,
+    CONSTANT_QNAME, CONSTANT_PACKAGE_NAMESPACE, CONSTANT_PRIVATE_NS,
+    TRAIT_SLOT, TRAIT_METHOD, TRAIT_CONST, TRAIT_GETTER, TRAIT_CLASS,
+    INSTANCE_SEALED, INSTANCE_FINAL,
+    ATTR_OVERRIDE,
 )
 from flashkit.info.class_info import build_all_classes
 
@@ -128,25 +128,25 @@ class TestAbcBuilderTraits:
 
     def test_trait_slot(self):
         t = AbcBuilder.trait_slot(name=3, type_mn=4, slot_id=1)
-        assert t.kind == TRAIT_Slot
+        assert t.kind == TRAIT_SLOT
         assert t.name == 3
 
     def test_trait_const(self):
         t = AbcBuilder.trait_slot(name=3, type_mn=4, is_const=True)
-        assert t.kind == TRAIT_Const
+        assert t.kind == TRAIT_CONST
 
     def test_trait_method(self):
         t = AbcBuilder.trait_method(name=5, method=1)
-        assert t.kind == TRAIT_Method
+        assert t.kind == TRAIT_METHOD
         assert t.name == 5
 
     def test_trait_getter(self):
-        t = AbcBuilder.trait_method(name=5, method=1, kind=TRAIT_Getter)
-        assert t.kind == TRAIT_Getter
+        t = AbcBuilder.trait_method(name=5, method=1, kind=TRAIT_GETTER)
+        assert t.kind == TRAIT_GETTER
 
     def test_trait_class(self):
         t = AbcBuilder.trait_class(name=1, class_index=0)
-        assert t.kind == TRAIT_Class
+        assert t.kind == TRAIT_CLASS
 
 
 class TestAbcBuilderClasses:

@@ -42,20 +42,20 @@ from .types import (
 )
 from .parser import write_u30
 from .constants import (
-    CONSTANT_QName, CONSTANT_QNameA,
-    CONSTANT_RTQName, CONSTANT_RTQNameA,
-    CONSTANT_Multiname, CONSTANT_MultinameA,
-    CONSTANT_MultinameL, CONSTANT_MultinameLA,
-    CONSTANT_TypeName,
-    CONSTANT_Namespace, CONSTANT_PackageNamespace, CONSTANT_PackageInternalNs,
-    CONSTANT_ProtectedNamespace, CONSTANT_ExplicitNamespace,
-    CONSTANT_StaticProtectedNs, CONSTANT_PrivateNs,
-    TRAIT_Slot, TRAIT_Method, TRAIT_Getter, TRAIT_Setter,
-    TRAIT_Class, TRAIT_Function, TRAIT_Const,
-    ATTR_Final, ATTR_Override, ATTR_Metadata,
-    METHOD_HasOptional, METHOD_HasParamNames,
-    METHOD_NeedArguments, METHOD_NeedActivation, METHOD_NeedRest,
-    INSTANCE_Sealed, INSTANCE_Final, INSTANCE_Interface, INSTANCE_ProtectedNs,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+    CONSTANT_TYPENAME,
+    CONSTANT_NAMESPACE, CONSTANT_PACKAGE_NAMESPACE, CONSTANT_PACKAGE_INTERNAL_NS,
+    CONSTANT_PROTECTED_NAMESPACE, CONSTANT_EXPLICIT_NAMESPACE,
+    CONSTANT_STATIC_PROTECTED_NS, CONSTANT_PRIVATE_NS,
+    TRAIT_SLOT, TRAIT_METHOD, TRAIT_GETTER, TRAIT_SETTER,
+    TRAIT_CLASS, TRAIT_FUNCTION, TRAIT_CONST,
+    ATTR_FINAL, ATTR_OVERRIDE, ATTR_METADATA,
+    METHOD_HAS_OPTIONAL, METHOD_HAS_PARAM_NAMES,
+    METHOD_NEED_ARGUMENTS, METHOD_NEED_ACTIVATION, METHOD_NEED_REST,
+    INSTANCE_SEALED, INSTANCE_FINAL, INSTANCE_INTERFACE, INSTANCE_PROTECTED_NS,
 )
 from .opcodes import (
     OP_GETLOCAL_0, OP_PUSHSCOPE, OP_RETURNVOID, OP_RETURNVALUE,
@@ -176,7 +176,7 @@ class AbcBuilder:
         """Add a namespace to the pool.
 
         Args:
-            kind: Namespace kind constant (CONSTANT_Namespace, etc.).
+            kind: Namespace kind constant (CONSTANT_NAMESPACE, etc.).
             name: String pool index for the namespace name.
 
         Returns:
@@ -201,7 +201,7 @@ class AbcBuilder:
         """
         if isinstance(name, str):
             name = self.string(name)
-        return self.namespace(CONSTANT_PackageNamespace, name)
+        return self.namespace(CONSTANT_PACKAGE_NAMESPACE, name)
 
     def private_namespace(self, name: int | str = 0) -> int:
         """Add a private namespace.
@@ -214,7 +214,7 @@ class AbcBuilder:
         """
         if isinstance(name, str):
             name = self.string(name)
-        return self.namespace(CONSTANT_PrivateNs, name)
+        return self.namespace(CONSTANT_PRIVATE_NS, name)
 
     def internal_namespace(self, name: int | str) -> int:
         """Add a package-internal namespace.
@@ -227,7 +227,7 @@ class AbcBuilder:
         """
         if isinstance(name, str):
             name = self.string(name)
-        return self.namespace(CONSTANT_PackageInternalNs, name)
+        return self.namespace(CONSTANT_PACKAGE_INTERNAL_NS, name)
 
     def protected_namespace(self, name: int | str) -> int:
         """Add a protected namespace.
@@ -240,7 +240,7 @@ class AbcBuilder:
         """
         if isinstance(name, str):
             name = self.string(name)
-        return self.namespace(CONSTANT_ProtectedNamespace, name)
+        return self.namespace(CONSTANT_PROTECTED_NAMESPACE, name)
 
     # ── Constant pool: namespace sets ──────────────────────────────────
 
@@ -273,11 +273,11 @@ class AbcBuilder:
             name = self.string(name)
         for i in range(1, len(self._multiname_pool)):
             mn = self._multiname_pool[i]
-            if mn.kind == CONSTANT_QName and mn.ns == ns and mn.name == name:
+            if mn.kind == CONSTANT_QNAME and mn.ns == ns and mn.name == name:
                 return i
         idx = len(self._multiname_pool)
         self._multiname_pool.append(MultinameInfo(
-            kind=CONSTANT_QName, ns=ns, name=name))
+            kind=CONSTANT_QNAME, ns=ns, name=name))
         return idx
 
     def multiname(self, name: int | str, ns_set: int) -> int:
@@ -294,7 +294,7 @@ class AbcBuilder:
             name = self.string(name)
         idx = len(self._multiname_pool)
         self._multiname_pool.append(MultinameInfo(
-            kind=CONSTANT_Multiname, name=name, ns_set=ns_set))
+            kind=CONSTANT_MULTINAME, name=name, ns_set=ns_set))
         return idx
 
     def rtqname(self, name: int | str) -> int:
@@ -310,7 +310,7 @@ class AbcBuilder:
             name = self.string(name)
         idx = len(self._multiname_pool)
         self._multiname_pool.append(MultinameInfo(
-            kind=CONSTANT_RTQName, name=name))
+            kind=CONSTANT_RTQNAME, name=name))
         return idx
 
     def typename(self, base: int, params: list[int]) -> int:
@@ -328,7 +328,7 @@ class AbcBuilder:
             param_bytes += write_u30(p)
         idx = len(self._multiname_pool)
         self._multiname_pool.append(MultinameInfo(
-            kind=CONSTANT_TypeName, ns=base, name=len(params),
+            kind=CONSTANT_TYPENAME, ns=base, name=len(params),
             data=bytes(param_bytes)))
         return idx
 
@@ -363,7 +363,7 @@ class AbcBuilder:
         resolved_flags = flags
         resolved_param_names: list[int] = []
         if param_names:
-            resolved_flags |= METHOD_HasParamNames
+            resolved_flags |= METHOD_HAS_PARAM_NAMES
             for pn in param_names:
                 if isinstance(pn, str):
                     resolved_param_names.append(self.string(pn))
@@ -372,7 +372,7 @@ class AbcBuilder:
 
         resolved_options: list[tuple[int, int]] = []
         if options:
-            resolved_flags |= METHOD_HasOptional
+            resolved_flags |= METHOD_HAS_OPTIONAL
             resolved_options = list(options)
 
         mi = MethodInfo(
@@ -446,14 +446,14 @@ class AbcBuilder:
             slot_id: Slot index.
             default_value: Default value pool index (0 = none).
             default_kind: Default value kind (only if default_value != 0).
-            is_const: If True, TRAIT_Const; else TRAIT_Slot.
+            is_const: If True, TRAIT_CONST; else TRAIT_SLOT.
 
         Returns:
             TraitInfo ready to attach to an instance or class.
         """
         return TraitInfo(
             name=name,
-            kind=TRAIT_Const if is_const else TRAIT_Slot,
+            kind=TRAIT_CONST if is_const else TRAIT_SLOT,
             slot_id=slot_id,
             type_name=type_mn,
             vindex=default_value,
@@ -465,7 +465,7 @@ class AbcBuilder:
         name: int,
         method: int,
         disp_id: int = 0,
-        kind: int = TRAIT_Method,
+        kind: int = TRAIT_METHOD,
         attrs: int = 0,
     ) -> TraitInfo:
         """Build a method/getter/setter trait.
@@ -474,8 +474,8 @@ class AbcBuilder:
             name: Multiname index for the method name.
             method: Method index.
             disp_id: Dispatch ID (usually 0).
-            kind: TRAIT_Method, TRAIT_Getter, or TRAIT_Setter.
-            attrs: Attribute flags (ATTR_Final, ATTR_Override).
+            kind: TRAIT_METHOD, TRAIT_GETTER, or TRAIT_SETTER.
+            attrs: Attribute flags (ATTR_FINAL, ATTR_OVERRIDE).
 
         Returns:
             TraitInfo ready to attach.
@@ -498,7 +498,7 @@ class AbcBuilder:
             TraitInfo ready to attach to a script.
         """
         return TraitInfo(
-            name=name, kind=TRAIT_Class,
+            name=name, kind=TRAIT_CLASS,
             slot_id=slot_id, class_idx=class_index,
         )
 
@@ -510,7 +510,7 @@ class AbcBuilder:
         super_name: int = 0,
         constructor: int | None = None,
         static_init: int | None = None,
-        flags: int = INSTANCE_Sealed,
+        flags: int = INSTANCE_SEALED,
         interfaces: list[int] | None = None,
         protected_ns: int = 0,
         instance_traits: list[TraitInfo] | None = None,
@@ -554,7 +554,7 @@ class AbcBuilder:
 
         inst_flags = flags
         if protected_ns:
-            inst_flags |= INSTANCE_ProtectedNs
+            inst_flags |= INSTANCE_PROTECTED_NS
 
         inst = InstanceInfo(
             name=name,
@@ -821,7 +821,7 @@ class AbcBuilder:
                     self.trait_slot(field_mn, type_mn=type_mn,
                                    slot_id=i + 1))
 
-        flags = INSTANCE_Interface if is_interface else INSTANCE_Sealed
+        flags = INSTANCE_INTERFACE if is_interface else INSTANCE_SEALED
 
         return self.define_class(
             name=cls_mn, super_name=super_mn, flags=flags,
