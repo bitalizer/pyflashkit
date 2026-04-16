@@ -10,14 +10,8 @@ from __future__ import annotations
 
 import struct
 
-from ..abc.types import AbcFile
 from ..abc.parser import read_u30
 from ..abc.constants import (
-    CONSTANT_QNAME, CONSTANT_QNAME_A,
-    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
-    CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
-    CONSTANT_TYPENAME,
-    CONSTANT_PACKAGE_NAMESPACE,
     CONSTANT_PRIVATE_NS,
     CONSTANT_PROTECTED_NAMESPACE,
     CONSTANT_STATIC_PROTECTED_NS,
@@ -447,129 +441,12 @@ def access_modifier(ns_kind: int) -> str:
     return "public"
 
 
-def _append_unique(xs: list, x) -> None:
-    """Append ``x`` to ``xs`` if not already present (order-preserving dedup)."""
-    if x not in xs:
-        xs.append(x)
+def typename_param_indices(data: bytes, count: int) -> list[int]:
+    """Decode the packed u30 parameter indices of a TypeName multiname.
 
-
-def _looks_like_type_name(name: str) -> bool:
-    """Heuristic: does ``name`` look like a type identifier, not a property/method?
-
-    Real AS3 types start uppercase (``Sprite``). But production SWFs frequently
-    obfuscate type names to ``_-Sg``, ``_-tp``, ``_-R3`` style, so leading
-    underscores also qualify. Everything else (camelCase properties, snake_case
-    locals) is rejected so method/property multinames don't pollute the
-    wildcard import list.
+    TypeName entries store parameter multiname indices as concatenated u30
+    bytes in ``MultinameInfo.data``. This helper iterates them safely.
     """
-    if not name:
-        return False
-    first = name[0]
-    return first.isupper() or first == "_"
-
-
-def collect_mn_package_namespaces(
-    abc: AbcFile,
-    mn_idx: int,
-    out: list[str],
-) -> None:
-    """Add any package namespaces referenced by this multiname into ``out``.
-
-    Used to build the wildcard import list. A multiname of kind
-    ``Multiname``/``MultinameL`` carries a namespace set; each
-    ``PackageNamespace`` inside contributes a potential wildcard import.
-    """
-    if not (0 < mn_idx < len(abc.multiname_pool)):
-        return
-    mn = abc.multiname_pool[mn_idx]
-    ns_set_idx = 0
-    if mn.kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
-        ns_set_idx = mn.ns_set
-    elif mn.kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA):
-        ns_set_idx = mn.ns_set
-    if not (0 < ns_set_idx < len(abc.ns_set_pool)):
-        return
-    for ns_idx in abc.ns_set_pool[ns_set_idx].namespaces:
-        if abc.namespace_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
-            ns_name = abc.namespace_name(ns_idx)
-            if ns_name:
-                _append_unique(out, ns_name)
-
-
-def collect_mn_package_namespaces_typed(
-    abc: AbcFile,
-    mn_idx: int,
-    out: list[str],
-) -> None:
-    """Like :func:`collect_mn_package_namespaces` but only for class-like names.
-
-    Restricts to multinames whose base name starts with uppercase, so
-    property/method names don't pollute the wildcard import list.
-    Recurses into ``TypeName`` parameters for generics like ``Vector.<Foo>``.
-    """
-    if not (0 < mn_idx < len(abc.multiname_pool)):
-        return
-    mn = abc.multiname_pool[mn_idx]
-
-    if mn.kind == CONSTANT_TYPENAME:
-        for pidx in _typename_param_indices(mn.data, mn.name):
-            _collect_typename_param(abc, pidx, out)
-        return
-
-    if mn.kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A):
-        name = abc.string(mn.name)
-        if not name or not _looks_like_type_name(name):
-            return  # Skip non-class names.
-        ns_set_idx = mn.ns_set
-    elif mn.kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA):
-        # Late-bound: we can't check the name, include for safety.
-        ns_set_idx = mn.ns_set
-    else:
-        return
-
-    if not (0 < ns_set_idx < len(abc.ns_set_pool)):
-        return
-    for ns_idx in abc.ns_set_pool[ns_set_idx].namespaces:
-        if abc.namespace_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
-            ns_name = abc.namespace_name(ns_idx)
-            if ns_name:
-                _append_unique(out, ns_name)
-
-
-def _collect_typename_param(
-    abc: AbcFile,
-    mn_idx: int,
-    out: list[str],
-) -> None:
-    """Inspect one TypeName parameter and add its package to the import list.
-
-    Handles QName params (single namespace) and Multiname params (ns set),
-    and recurses into nested TypeName params.
-    """
-    if not (0 < mn_idx < len(abc.multiname_pool)):
-        return
-    mn = abc.multiname_pool[mn_idx]
-
-    if mn.kind == CONSTANT_TYPENAME:
-        for pidx in _typename_param_indices(mn.data, mn.name):
-            _collect_typename_param(abc, pidx, out)
-        return
-
-    if mn.kind in (CONSTANT_QNAME, CONSTANT_QNAME_A):
-        name = abc.string(mn.name)
-        if name and _looks_like_type_name(name):
-            if abc.namespace_kind(mn.ns) == CONSTANT_PACKAGE_NAMESPACE:
-                ns_name = abc.namespace_name(mn.ns)
-                if ns_name:
-                    _append_unique(out, ns_name)
-        return
-
-    # Fallback: Multiname/MultinameL parameter.
-    collect_mn_package_namespaces_typed(abc, mn_idx, out)
-
-
-def _typename_param_indices(data: bytes, count: int) -> list[int]:
-    """Decode the packed u30 parameter indices of a TypeName multiname."""
     params: list[int] = []
     off = 0
     for _ in range(count):
