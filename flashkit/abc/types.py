@@ -299,3 +299,130 @@ class AbcFile:
     classes: list[ClassInfo] = field(default_factory=list)
     scripts: list[ScriptInfo] = field(default_factory=list)
     method_bodies: list[MethodBodyInfo] = field(default_factory=list)
+
+    # ── Safe pool accessors ────────────────────────────────────────────────
+    # These collapse the common "check bounds / fall back to sentinel" pattern
+    # so decompilers and analyzers don't need to wrap every lookup in try/except.
+    # The AVM2 spec treats index 0 as "any string / any name", so all accessors
+    # return the spec-appropriate sentinel for idx 0 or out-of-range.
+
+    def string(self, idx: int) -> str:
+        """Return ``string_pool[idx]`` or ``""`` if idx is 0 or out of range.
+
+        AVM2 treats string index 0 as "any string" sentinel; callers generally
+        want an empty string in that case.
+        """
+        if 0 < idx < len(self.string_pool):
+            return self.string_pool[idx]
+        return ""
+
+    def integer(self, idx: int) -> int:
+        """Return ``int_pool[idx]`` or 0 if idx is 0 or out of range."""
+        if 0 < idx < len(self.int_pool):
+            return self.int_pool[idx]
+        return 0
+
+    def uinteger(self, idx: int) -> int:
+        """Return ``uint_pool[idx]`` or 0 if idx is 0 or out of range."""
+        if 0 < idx < len(self.uint_pool):
+            return self.uint_pool[idx]
+        return 0
+
+    def double(self, idx: int) -> float:
+        """Return ``double_pool[idx]`` or 0.0 if idx is 0 or out of range."""
+        if 0 < idx < len(self.double_pool):
+            return self.double_pool[idx]
+        return 0.0
+
+    # ── Namespace accessors ────────────────────────────────────────────────
+
+    def namespace_name(self, idx: int) -> str:
+        """Return the string name of a namespace, or ``""`` on idx 0 / out of range."""
+        if 0 < idx < len(self.namespace_pool):
+            return self.string(self.namespace_pool[idx].name)
+        return ""
+
+    def namespace_kind(self, idx: int) -> int:
+        """Return the kind byte of a namespace, or 0 on idx 0 / out of range."""
+        if 0 < idx < len(self.namespace_pool):
+            return self.namespace_pool[idx].kind
+        return 0
+
+    # ── Multiname accessors ────────────────────────────────────────────────
+    # These delegate to flashkit.info.member_info for the actual resolution
+    # logic so name resolution stays in one place.
+
+    def multiname_name(self, idx: int) -> str:
+        """Return the unqualified name of a multiname, or ``"*"`` for idx 0.
+
+        Handles parameterized types (``Vector.<int>``) by delegating to the
+        full resolver.
+        """
+        from ..info.member_info import resolve_multiname
+        return resolve_multiname(self, idx)
+
+    def multiname_full(self, idx: int) -> str:
+        """Return the fully qualified name ``"package.Name"``, or ``"*"`` for idx 0.
+
+        Packages appear only for QName/QNameA multinames with a package namespace.
+        Other multiname kinds fall back to the unqualified name.
+        """
+        from ..info.member_info import resolve_multiname_full
+        package, name = resolve_multiname_full(self, idx)
+        if package and name and name != "*":
+            return f"{package}.{name}"
+        return name
+
+    def multiname_namespace(self, idx: int) -> str:
+        """Return the package/namespace string of a multiname, or ``""``.
+
+        For QName/QNameA this is the namespace's string name. For other kinds
+        (RTQName, Multiname) the namespace is not statically known and ``""``
+        is returned.
+        """
+        from ..info.member_info import resolve_multiname_full
+        package, _ = resolve_multiname_full(self, idx)
+        return package
+
+    def multiname_type(self, idx: int) -> str:
+        """Alias for :meth:`multiname_name` — returns a formatted type string.
+
+        For TypeName multinames this includes the generic parameters, e.g.
+        ``"Vector.<int>"``. Provided for readability at call sites that are
+        resolving a trait type reference rather than an arbitrary multiname.
+        """
+        return self.multiname_name(idx)
+
+    def multiname_is_attr(self, idx: int) -> bool:
+        """Return True if the multiname is an XML attribute form (QNameA, etc.)."""
+        if not (0 < idx < len(self.multiname_pool)):
+            return False
+        from .constants import (
+            CONSTANT_QNAME_A, CONSTANT_RTQNAME_A, CONSTANT_RTQNAME_LA,
+            CONSTANT_MULTINAME_A, CONSTANT_MULTINAME_LA,
+        )
+        return self.multiname_pool[idx].kind in (
+            CONSTANT_QNAME_A, CONSTANT_RTQNAME_A, CONSTANT_RTQNAME_LA,
+            CONSTANT_MULTINAME_A, CONSTANT_MULTINAME_LA,
+        )
+
+    def multiname_is_runtime(self, idx: int) -> bool:
+        """Return True if the multiname needs runtime resolution of name and/or ns.
+
+        RTQName/RTQNameL/MultinameL all pop their name and/or namespace off
+        the AVM2 operand stack at runtime, so static lookup returns a
+        placeholder. Decompilers use this to emit stack-sourced expressions
+        instead of literal names.
+        """
+        if not (0 < idx < len(self.multiname_pool)):
+            return False
+        from .constants import (
+            CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+            CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA,
+            CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+        )
+        return self.multiname_pool[idx].kind in (
+            CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
+            CONSTANT_RTQNAME_L, CONSTANT_RTQNAME_LA,
+            CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+        )
