@@ -10,8 +10,10 @@ added in later phases.
 
 from .cfg import BasicBlock, CFG, build_cfg_from_bytecode
 from .dominators import compute_idom, compute_ipostdom
+from .loops import Loop, LoopTree, find_loops, build_loop_tree
 
 __all__ = [
     "BasicBlock", "CFG", "build_cfg_from_bytecode",
     "compute_idom", "compute_ipostdom",
+    "Loop", "LoopTree", "find_loops", "build_loop_tree",
 ]
