@@ -2661,6 +2661,9 @@ class MethodDecompiler:
         find the loop variable's initializer (e.g., ``var i:int;`` followed by
         ``var sum:int;`` followed by ``while (i < 10)``).
         """
+        # Build brace-match table once up front so nested close lookups
+        # are O(1) instead of a linear re-scan per candidate.
+        close_map = MethodDecompiler._build_brace_close_map(stmts)
         result: List[str] = []
         i = 0
         while i < len(stmts):
@@ -2683,13 +2686,14 @@ class MethodDecompiler:
 
                 # Verify next stmt is '{'
                 if i + 1 < len(stmts) and stmts[i + 1].strip() == '{':
-                    # Find matching '};'
-                    depth = 1
-                    j = i + 2
-                    while j < len(stmts) and depth > 0:
-                        depth += MethodDecompiler._count_net_braces(stmts[j])
-                        j += 1
-                    close_idx = j - 1  # index of };
+                    # O(1) close lookup via precomputed table.
+                    close_idx_ = close_map.get(i + 1)
+                    if close_idx_ is None:
+                        close_idx = -1
+                        depth = 1  # unmatched → fall through to unmatched branch below
+                    else:
+                        close_idx = close_idx_
+                        depth = 0
 
                     if depth == 0 and close_idx > i + 2:
                         # Last body statement (before };)
@@ -2860,13 +2864,48 @@ class MethodDecompiler:
         return count
 
     @staticmethod
+    def _build_brace_close_map(stmts: List[str]) -> Dict[int, int]:
+        """Return ``{open_stmt_idx: close_stmt_idx}`` mapping in O(N).
+
+        For each statement where net braces > 0 (opens a block), records the
+        statement index where the matching close balances the depth. Using
+        this table, the fold passes look up the enclosing close in O(1)
+        instead of rescanning with _count_net_braces on every nested block
+        (which otherwise makes the whole pass O(N²)).
+
+        Unmatched opens (malformed/partial input) are omitted.
+        """
+        close_map: Dict[int, int] = {}
+        # Stack of (open_stmt_idx, depth_after_open).
+        stack: list[tuple[int, int]] = []
+        net_cache = MethodDecompiler._count_net_braces
+        for j, s in enumerate(stmts):
+            n = net_cache(s)
+            if n > 0:
+                # Statement opens n new blocks; each matches in its own frame.
+                for _ in range(n):
+                    stack.append((j, 0))
+            elif n < 0:
+                # Close applies to the most recently-opened (bottom-of-stack)
+                # frames.  We consume |n| frames.
+                for _ in range(-n):
+                    if not stack:
+                        break
+                    open_idx, _ = stack.pop()
+                    # First close wins: earliest close becomes canonical.
+                    close_map.setdefault(open_idx, j)
+        return close_map
+
+    @staticmethod
     def _fold_while_to_for_recursive(stmts: List[str]) -> List[str]:
         """Apply _fold_while_to_for inside nested blocks (for, while, if, etc.).
 
         Handles both separate-line braces (header + ``{``) and inline braces
-        (e.g. ``switch (N) {``).  Uses brace counting that correctly tracks
-        depth through try/catch, switch/case, and other block types (issue #32).
+        (e.g. ``switch (N) {``).  Uses a brace-match table built once per
+        call so close-index lookup is O(1) instead of a linear rescan per
+        candidate (which used to make this whole pass O(N²)).
         """
+        close_map = MethodDecompiler._build_brace_close_map(stmts)
         result: List[str] = []
         i = 0
         while i < len(stmts):
@@ -2875,14 +2914,8 @@ class MethodDecompiler:
             # Case 1: Block with { on separate next line (standard format from
             # _struct_block, _fold_try_catch, _fold_switch, etc.)
             if i + 1 < len(stmts) and stmts[i + 1].strip() == '{':
-                # Find the matching close brace using robust brace counting
-                depth = 1
-                j = i + 2
-                while j < len(stmts) and depth > 0:
-                    depth += MethodDecompiler._count_net_braces(stmts[j])
-                    j += 1
-                close_idx = j - 1
-                if depth == 0:
+                close_idx = close_map.get(i + 1, -1)
+                if close_idx > 0:
                     result.append(stmts[i])  # header line
                     result.append(stmts[i + 1])  # {
                     # Recursively fold the inner body
@@ -2895,15 +2928,9 @@ class MethodDecompiler:
 
             # Case 2: Header line with inline { (e.g. "switch (N) {")
             # The line itself opens a block — no separate { line.
-            net = MethodDecompiler._count_net_braces(s)
-            if net > 0 and s != '{' and not s.startswith('//'):
-                depth = net
-                j = i + 1
-                while j < len(stmts) and depth > 0:
-                    depth += MethodDecompiler._count_net_braces(stmts[j])
-                    j += 1
-                close_idx = j - 1
-                if depth == 0:
+            if s != '{' and not s.startswith('//'):
+                close_idx = close_map.get(i, -1)
+                if close_idx > 0 and close_idx != i:
                     result.append(stmts[i])  # header with {
                     inner = stmts[i + 1:close_idx]
                     inner = MethodDecompiler._fold_while_to_for(inner)
@@ -3070,7 +3097,7 @@ class MethodDecompiler:
 
     def _structure_flow(self, stmts: List[str]) -> List[str]:
         """Convert goto-based statements into structured if/else/while blocks."""
-        # Build label → position mapping
+        # Build label → position mapping in a single pass over stmts.
         label_pos: Dict[str, int] = {}
         for i, s in enumerate(stmts):
             m = _RE_LABEL_NUM_COLON.match(s.strip())
@@ -3083,13 +3110,39 @@ class MethodDecompiler:
                 stmts = stmts[:-1]
             return stmts
 
+        # Precompute goto-site index once so _find_back_goto is O(log N)
+        # instead of a linear scan on every loop-header candidate. Without
+        # this, deeply nested methods re-scan the same ranges thousands of
+        # times and blow up to O(N²). See _find_back_goto for the lookup.
+        goto_sites: Dict[str, List[int]] = {}
+        for j, s in enumerate(stmts):
+            ss = s.strip()
+            # Unconditional: "goto __label_NN;"
+            if ss.startswith('goto __label_') and ss.endswith(';'):
+                # Extract label between 'goto ' and ';'
+                lbl = ss[5:-1]
+                goto_sites.setdefault(lbl, []).append(j)
+            # Conditional: "if (...) goto __label_NN;"
+            elif ss.startswith('if (') and ') goto __label_' in ss and ss.endswith(';'):
+                idx = ss.rfind(') goto ')
+                lbl = ss[idx + 7:-1]
+                goto_sites.setdefault(lbl, []).append(j)
+
         # Save/restore shared state for re-entrancy (issue #21):
         # _decompile_inline_function() may call _structure_flow() recursively
         # while an outer _structure_flow() is still in progress.
         prev_counter = getattr(self, '_loop_label_counter', 0)
         prev_labels = getattr(self, '_needs_loop_label', set())
+        prev_goto_sites = getattr(self, '_goto_sites', None)
+        prev_struct_cache = getattr(self, '_struct_cache', None)
         self._loop_label_counter = 0
         self._needs_loop_label = set()
+        self._goto_sites = goto_sites
+        # Per-flow cache for _struct_block results. Same (start, end, loop_ctx)
+        # can be visited by multiple parent branches — chained if/else nodes
+        # all call _struct_block(target_pos+1, end, ...) on largely overlapping
+        # ranges, producing exponential reprocessing without this.
+        self._struct_cache: Dict[tuple, List[str]] = {}
 
         result = self._struct_block(stmts, 0, len(stmts), label_pos, depth=0)
 
@@ -3131,6 +3184,8 @@ class MethodDecompiler:
         # Restore previous state for the outer call
         self._loop_label_counter = prev_counter
         self._needs_loop_label = prev_labels
+        self._goto_sites = prev_goto_sites
+        self._struct_cache = prev_struct_cache
 
         return result
 
@@ -3145,10 +3200,20 @@ class MethodDecompiler:
             'break_label_map': dict mapping label_name → None (own loop) or
                                (loop_label_str, needs_label_set) for outer loops
         depth: current recursion depth for overflow protection
+
+        Memoized on ``(start, end, id(loop_ctx))`` — chained if/else nodes
+        repeatedly call this function on overlapping tail ranges, so caching
+        the result turns what was exponential in nesting into linear.
         """
         if depth > _MAX_STRUCT_DEPTH:
             # Recursion too deep — emit remaining statements flat
             return [stmts[j] for j in range(start, end) if stmts[j].strip()]
+
+        cache_key = (start, end, id(loop_ctx))
+        cached = self._struct_cache.get(cache_key)
+        if cached is not None:
+            # Return a fresh list so callers can mutate without poisoning the cache.
+            return list(cached)
 
         result: List[str] = []
         i = start
@@ -3361,22 +3426,31 @@ class MethodDecompiler:
             result.append(s)
             i += 1
 
+        # Store a defensive copy in the cache so callers mutating the returned
+        # list don't pollute subsequent cache hits.
+        self._struct_cache[cache_key] = list(result)
         return result
 
     # ── Loop emission ─────────────────────────────────────────────
     def _find_back_goto(self, stmts: List[str], label_idx: int,
                         end: int, label_name: str) -> Optional[int]:
-        """Find a backward goto/if-goto targeting label_name after label_idx."""
-        # Use fast string matching instead of regex (performance hotspot)
-        goto_exact = f'goto {label_name};'
-        if_goto_suffix = f') goto {label_name};'
-        for j in range(label_idx + 1, end):
-            s = stmts[j].strip()
-            if s == goto_exact:
-                return j
-            if s.startswith('if (') and s.endswith(if_goto_suffix):
-                return j
-        return None
+        """Find the first goto/if-goto targeting ``label_name`` in
+        ``(label_idx, end)``.
+
+        Uses the ``_goto_sites`` index precomputed by ``_structure_flow``:
+        ``goto_sites[label_name]`` is a sorted list of statement indices
+        where a goto to that label lives, so lookup becomes O(log N) via
+        bisect instead of a per-call linear scan over ``stmts``.
+        """
+        sites = self._goto_sites.get(label_name) if self._goto_sites else None
+        if not sites:
+            return None
+        import bisect
+        pos = bisect.bisect_right(sites, label_idx)
+        if pos >= len(sites):
+            return None
+        j = sites[pos]
+        return j if j < end else None
 
     def _next_loop_label(self) -> str:
         """Generate a unique loop label for labeled break support."""
@@ -3560,15 +3634,18 @@ class MethodDecompiler:
                     else_block = self._struct_block(stmts, target_pos + 1,
                                                    end_pos, label_pos,
                                                    loop_ctx, depth + 1)
+                    # extend with a generator — avoids a per-line Python-level
+                    # loop that allocates one throwaway f-string per item and
+                    # calls .append() once per item (13M calls on the
+                    # pathological method). ``extend`` is a single C-level
+                    # operation that iterates without the per-element overhead.
                     result.append(f'if ({neg_cond})')
                     result.append('{')
-                    for t in then_block:
-                        result.append(f'{INDENT_UNIT}{t}')
+                    result.extend(f'{INDENT_UNIT}{t}' for t in then_block)
                     result.append('}')
                     result.append('else')
                     result.append('{')
-                    for e in else_block:
-                        result.append(f'{INDENT_UNIT}{e}')
+                    result.extend(f'{INDENT_UNIT}{e}' for e in else_block)
                     result.append('};')
                     nxt = end_pos
                     if nxt < end and stmts[nxt].strip().startswith('__label_') \
