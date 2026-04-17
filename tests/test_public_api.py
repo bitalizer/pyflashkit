@@ -19,9 +19,9 @@ def test_all_names_resolve(module_path):
             f"{module_path}.__all__ lists {name!r} but module has no such attribute")
 
 
-def test_version_is_1_2_0():
+def test_version_is_1_3_0():
     import flashkit
-    assert flashkit.__version__ == "1.2.0"
+    assert flashkit.__version__ == "1.3.0"
 
 
 def test_workspace_exported():

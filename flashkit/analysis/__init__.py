@@ -13,6 +13,10 @@ Modules:
     field_access: FieldAccessIndex — field read/write tracking from bytecode.
     method_fingerprint: MethodFingerprint — structural features of method bodies.
     class_graph: ClassGraph — class-to-class reference graph with typed edges.
+    liveness: LocalLiveness — per-method register read/write summary.
+    const_args: ConstArgIndex — literal arguments observed at call sites.
+    dead_code: dead class / method detection + entry-point candidates.
+    complexity: McCabe cyclomatic complexity for method bodies.
 """
 
 from .inheritance import InheritanceGraph
@@ -33,6 +37,16 @@ from .class_graph import (
     CLASS_EDGE_KINDS,
 )
 from .unified import build_all_indexes
+from .liveness import LocalLiveness, method_liveness
+from .const_args import ConstArgIndex, ConstArgObservation
+from .dead_code import (
+    DeadMethodReport,
+    entrypoint_candidates,
+    find_dead_classes,
+    find_dead_methods,
+    find_entrypoints_and_dead_classes,
+)
+from .complexity import MethodComplexity, cfg_complexity, method_complexity
 
 __all__ = [
     "InheritanceGraph",
@@ -53,4 +67,16 @@ __all__ = [
     "FRAMEWORK_TYPES",
     "CLASS_EDGE_KINDS",
     "build_all_indexes",
+    "LocalLiveness",
+    "method_liveness",
+    "ConstArgIndex",
+    "ConstArgObservation",
+    "DeadMethodReport",
+    "entrypoint_candidates",
+    "find_dead_classes",
+    "find_dead_methods",
+    "find_entrypoints_and_dead_classes",
+    "MethodComplexity",
+    "cfg_complexity",
+    "method_complexity",
 ]

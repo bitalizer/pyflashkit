@@ -243,3 +243,46 @@ def check_mn_ns_set_typed(abc, mn_idx: int, result: list) -> None:
                 ns = abc.ns_name(ns_idx)
                 if ns and ns not in result:
                     result.append(ns)
+
+
+def build_class_name_set(abc) -> set[int]:
+    """Return the set of string-pool indices naming *actual class
+    traits* across an ABC.
+
+    The structural replacement for the ``name[0].isupper()`` heuristic.
+    Walk every trait on every instance / class / script, and collect
+    the name_idx of each trait whose kind is ``TRAIT_CLASS``. A
+    downstream caller can then check ``string_name_idx in the set``
+    instead of guessing from capitalisation — which misses obfuscated
+    type names like ``#F`` and falsely includes uppercase-first
+    property names.
+
+    Consumers are expected to build this once per ABC (O(traits)),
+    then reuse it across many ``check_mn_ns_set_typed`` calls.
+    Wildcard-import harvesting currently still uses the
+    capitalisation heuristic; this helper is exposed so that
+    downstream deobfuscator passes can adopt the structural check
+    incrementally.
+    """
+    from ..abc.constants import TRAIT_CLASS
+
+    # ABC layer fields vary: the adapter exposes .strings / .multinames
+    # while raw AbcFile uses .string_pool / .multiname_pool. Work with
+    # whatever the caller passes in.
+    instances = getattr(abc, "instances", [])
+    classes = getattr(abc, "classes", [])
+    scripts = getattr(abc, "scripts", [])
+
+    out: set[int] = set()
+    for bucket in (instances, classes, scripts):
+        for entry in bucket:
+            for t in getattr(entry, "traits", ()):
+                # The adapter view uses name_idx, raw TraitInfo uses name.
+                kind = getattr(t, "kind", None)
+                if kind != TRAIT_CLASS:
+                    continue
+                name_idx = getattr(t, "name_idx",
+                                   getattr(t, "name", 0))
+                if name_idx:
+                    out.add(name_idx)
+    return out
