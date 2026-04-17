@@ -16,6 +16,11 @@ from ..abc.constants import (
     CONSTANT_PROTECTED_NAMESPACE,
     CONSTANT_STATIC_PROTECTED_NS,
     CONSTANT_PACKAGE_INTERNAL_NS,
+    CONSTANT_PACKAGE_NAMESPACE,
+    CONSTANT_QNAME, CONSTANT_QNAME_A,
+    CONSTANT_MULTINAME, CONSTANT_MULTINAME_A,
+    CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA,
+    CONSTANT_TYPENAME,
 )
 from ..abc.opcodes import (
     OP_PUSHBYTE, OP_PUSHSHORT, OP_PUSHSTRING, OP_PUSHINT, OP_PUSHUINT,
@@ -513,3 +518,91 @@ def skip_operands(op: int, code: bytes, p: int) -> int:
         return p
     except (IndexError, struct.error, ValueError):
         return len(code)
+
+
+# ── Wildcard-import harvesting ──────────────────────────────────────────────
+#
+# These helpers feed ``class_.py``'s import-collection pass, which scans for
+# multinames with an NS-set and promotes any package-kind namespace to a
+# wildcard ``import pkg.*``.
+#
+# The name-case guard is a known heuristic — "identifier starts with an
+# uppercase letter, probably a class" — that fails on obfuscated SWFs.
+# Preserved for now because removing it changes visible import output;
+# schedule for replacement with a structural check (trait kind) in a
+# follow-up.
+
+
+def check_mn_ns_set(abc, mn_idx: int, result: list) -> None:
+    """If the multiname at ``mn_idx`` uses a namespace set, append each
+    package-namespace to ``result`` (preserving insertion order)."""
+    if mn_idx >= len(abc.multinames):
+        return
+    kind, data = abc.multinames[mn_idx]
+    ns_set_idx = 0
+    if kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A) and data and len(data) >= 2:
+        ns_set_idx = data[1]
+    elif kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA) and data:
+        ns_set_idx = data[0]
+    if ns_set_idx and ns_set_idx < len(abc.ns_sets):
+        for ns_idx in abc.ns_sets[ns_set_idx]:
+            if abc.ns_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
+                ns = abc.ns_name(ns_idx)
+                if ns and ns not in result:
+                    result.append(ns)
+
+
+def check_typename_param(abc, mn_idx: int, result: list) -> None:
+    """Walk a TypeName parameter and add any referenced package to
+    ``result``. Handles nested TypeName and QName/Multiname params."""
+    if mn_idx >= len(abc.multinames):
+        return
+    kind, data = abc.multinames[mn_idx]
+    if kind == CONSTANT_TYPENAME and data:
+        _qn, params = data
+        for px in params:
+            check_typename_param(abc, px, result)
+        return
+    if kind in (CONSTANT_QNAME, CONSTANT_QNAME_A) and data and len(data) >= 2:
+        name_idx = data[1]
+        name = abc.strings[name_idx] if name_idx < len(abc.strings) else ""
+        if name and name[0].isupper():
+            ns_idx = data[0]
+            if ns_idx < len(abc.namespaces):
+                if abc.ns_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
+                    ns = abc.ns_name(ns_idx)
+                    if ns and ns not in result:
+                        result.append(ns)
+        return
+    check_mn_ns_set_typed(abc, mn_idx, result)
+
+
+def check_mn_ns_set_typed(abc, mn_idx: int, result: list) -> None:
+    """Like :func:`check_mn_ns_set` but only for class-like names —
+    guards against polluting the wildcard list with property and method
+    access multinames whose NS-sets aren't actually type references."""
+    if mn_idx >= len(abc.multinames):
+        return
+    kind, data = abc.multinames[mn_idx]
+    if kind == CONSTANT_TYPENAME and data:
+        _qn, params = data
+        for px in params:
+            check_typename_param(abc, px, result)
+        return
+    if kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A) and data and len(data) >= 2:
+        name_idx = data[0]
+        name = abc.strings[name_idx] if name_idx < len(abc.strings) else ""
+        if not name or not name[0].isupper():
+            return  # skip non-class names
+        ns_set_idx = data[1]
+    elif kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA) and data:
+        # Late-bound: can't check the name, include for safety.
+        ns_set_idx = data[0]
+    else:
+        return
+    if ns_set_idx and ns_set_idx < len(abc.ns_sets):
+        for ns_idx in abc.ns_sets[ns_set_idx]:
+            if abc.ns_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
+                ns = abc.ns_name(ns_idx)
+                if ns and ns not in result:
+                    result.append(ns)
