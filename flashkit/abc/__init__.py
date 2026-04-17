@@ -44,6 +44,8 @@ from .parser import (
 from .writer import serialize_abc
 from .disasm import Instruction, ResolvedInstruction, decode_instructions, resolve_instructions, scan_relevant_opcodes
 from .builder import AbcBuilder
+from . import constants as _constants
+from .constants import *  # noqa: F401,F403 — curated __all__ on constants
 
 __all__ = [
     # Types
@@ -81,4 +83,6 @@ __all__ = [
     "scan_relevant_opcodes",
     # Builder
     "AbcBuilder",
+    # AVM2 constants (re-exported from .constants)
+    *_constants.__all__,
 ]
