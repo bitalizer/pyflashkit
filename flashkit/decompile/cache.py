@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 from ..swf.parser import parse_swf
 from ..swf.tags import TAG_DO_ABC, TAG_DO_ABC2

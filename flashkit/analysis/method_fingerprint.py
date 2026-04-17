@@ -20,8 +20,6 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from dataclasses import dataclass
-from typing import Optional
-
 from ..abc.disasm import decode_instructions
 from ..abc.types import AbcFile
 from ..errors import ABCParseError
@@ -183,7 +181,7 @@ def extract_fingerprint(
     method: MethodInfoResolved,
     abc: AbcFile,
     is_constructor: bool = False,
-) -> Optional[MethodFingerprint]:
+) -> MethodFingerprint | None:
     """Produce a fingerprint for one method.
 
     Returns None if the body is missing or the bytecode can't be
@@ -336,7 +334,7 @@ def extract_fingerprint(
 def extract_constructor_fingerprint(
     cls: ClassInfo,
     abc: AbcFile,
-) -> Optional[MethodFingerprint]:
+) -> MethodFingerprint | None:
     """Fingerprint a class constructor (iinit).
 
     Returns None if the constructor has no body.

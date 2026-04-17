@@ -28,8 +28,6 @@ un-idiomatic) structuring.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from ..graph.cfg import CFG, BasicBlock
 from ..graph.loops import Loop
 from .ast.nodes import (
@@ -106,7 +104,7 @@ class _StructureContext:
 
     # ── block lookups ──────────────────────────────────────────────────────
 
-    def _block_by_index(self, idx: int) -> Optional[BasicBlock]:
+    def _block_by_index(self, idx: int) -> BasicBlock | None:
         if idx < 0 or idx >= len(self.cfg.blocks):
             return None
         return self.cfg.blocks[idx]
@@ -118,8 +116,8 @@ class _StructureContext:
 
     def structure_region(
         self,
-        start: Optional[BasicBlock],
-        stop_at: Optional[BasicBlock],
+        start: BasicBlock | None,
+        stop_at: BasicBlock | None,
     ) -> list[Statement]:
         """Structure a region starting at ``start`` and stopping when
         we reach ``stop_at`` (or a terminator block)."""
@@ -315,7 +313,7 @@ class _StructureContext:
             return s1, s0
         return None, None
 
-    def _loop_continuation(self, loop: Loop) -> Optional[BasicBlock]:
+    def _loop_continuation(self, loop: Loop) -> BasicBlock | None:
         """Find the block that structuring should continue from after
         a loop. This is the loop's single exit target, if there's one.
         If there are multiple exits, we return the first in block-index
@@ -445,7 +443,7 @@ class _StructureContext:
             finally_body=None,
         )
 
-    def _try_continuation(self, entry: BasicBlock, handlers) -> Optional[BasicBlock]:
+    def _try_continuation(self, entry: BasicBlock, handlers) -> BasicBlock | None:
         """Where the main walk should resume after a try/catch."""
         first = handlers[0]
         for bb in self.cfg.blocks:

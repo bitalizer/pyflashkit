@@ -24,7 +24,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .cfg import CFG, BasicBlock
 
@@ -50,7 +49,7 @@ class Loop:
     tail: BasicBlock
     body: frozenset[BasicBlock] = field(default_factory=frozenset)
     exits: list[BasicBlock] = field(default_factory=list)
-    parent: Optional["Loop"] = None
+    parent: "Loop | None" = None
 
     def __repr__(self) -> str:
         return (f"Loop(header=#{self.header.index}, "
@@ -160,7 +159,7 @@ def find_loops(cfg: CFG, idom: dict[int, int]) -> list[Loop]:
     # Parent linking by set containment. Parent = smallest enclosing
     # ancestor (smallest body that strictly contains this one).
     for i, inner in enumerate(loops):
-        smallest_parent: Optional[Loop] = None
+        smallest_parent: Loop | None = None
         for j, outer in enumerate(loops):
             if i == j:
                 continue
