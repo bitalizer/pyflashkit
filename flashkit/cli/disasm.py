@@ -14,13 +14,28 @@ def register(sub: argparse._SubParsersAction) -> None:
                    help="Class to disassemble")
     p.add_argument("--method-index", type=int,
                    help="Method index to disassemble")
+    p.add_argument("--raw", action="store_true",
+                   help="Show raw pool indices instead of resolved names")
     p.set_defaults(func=run)
+
+
+def _render(mb, abc, resolve: bool) -> None:
+    from ..abc.disasm import decode_instructions, resolve_instructions
+
+    instrs = decode_instructions(mb.code)
+    if resolve:
+        for r in resolve_instructions(abc, instrs):
+            ops = ", ".join(r.operands) if r.operands else ""
+            print(f"  0x{r.offset:04X}  {r.mnemonic:<24s} {ops}")
+    else:
+        for instr in instrs:
+            ops = ", ".join(str(o) for o in instr.operands)
+            print(f"  0x{instr.offset:04X}  {instr.mnemonic:<24s} {ops}")
 
 
 def run(args: argparse.Namespace) -> None:
     ws = load(args.file)
-
-    from ..abc.disasm import decode_instructions
+    resolve = not args.raw
 
     if args.method_index is not None:
         for abc in ws.abc_blocks:
@@ -30,10 +45,7 @@ def run(args: argparse.Namespace) -> None:
                           f"  (max_stack={mb.max_stack}, "
                           f"locals={mb.local_count}, "
                           f"code={len(mb.code)} bytes)")
-                    for instr in decode_instructions(mb.code):
-                        ops = ", ".join(str(o) for o in instr.operands)
-                        print(f"  0x{instr.offset:04X}  "
-                              f"{instr.mnemonic:<24s} {ops}")
+                    _render(mb, abc, resolve)
                     return
         print(f"Method index {args.method_index} not found.")
         return
@@ -67,10 +79,7 @@ def run(args: argparse.Namespace) -> None:
 
                     print(bold(f"{cls.name}.{mname}") +
                           f"  ({len(mb.code)} bytes)")
-                    for instr in decode_instructions(mb.code):
-                        ops = ", ".join(str(o) for o in instr.operands)
-                        print(f"  0x{instr.offset:04X}  "
-                              f"{instr.mnemonic:<24s} {ops}")
+                    _render(mb, abc, resolve)
                     print()
         return
 
