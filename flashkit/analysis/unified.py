@@ -15,7 +15,12 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
+
+from ..errors import ABCParseError
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..workspace.workspace import Workspace
@@ -134,7 +139,9 @@ def build_all_indexes(
 
             try:
                 hits = scan_relevant_opcodes(body.code, _ALL_RELEVANT_OPS)
-            except Exception:
+            except (ABCParseError, IndexError, ValueError) as exc:
+                log.debug("unified: skip body method=%d: %s",
+                          body.method, exc)
                 continue
 
             for offset, op, operand in hits:

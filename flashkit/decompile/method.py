@@ -110,6 +110,11 @@ class MethodDecompiler:
             root = structure_method(cfg, idom, ipostdom, loops, block_results)
             root = apply_patterns(root)
             printed = AstPrinter().print(root)
+        # Broad catch is intentional: the decompiler pipeline runs
+        # across CFG, dominators, stack sim, structurer, and pattern
+        # rewrites — any of them can raise novel internal errors on
+        # adversarial bytecode. Surface as a comment in the output so
+        # callers keep working rather than abort a batch decompile.
         except Exception as exc:  # noqa: BLE001
             log.warning("decompile(method=%d) failed: %s", method_idx, exc)
             return f"{indent}// decompile error: {exc}\n"
@@ -251,6 +256,8 @@ def _ast_equal(a: Expression, b: Expression) -> bool:
         return False
     try:
         return a == b
+    # Non-dataclass AST nodes with custom __eq__ can raise on mismatched
+    # operand types. Fall back to identity so meet stays total.
     except Exception:  # noqa: BLE001
         return a is b
 

@@ -17,12 +17,16 @@ shape (heavy branching, many calls, etc.) during analysis.
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
 
 from ..abc.disasm import decode_instructions
 from ..abc.types import AbcFile
+from ..errors import ABCParseError
+
+log = logging.getLogger(__name__)
 from ..info.class_info import ClassInfo
 from ..info.member_info import (
     MethodInfoResolved,
@@ -194,7 +198,9 @@ def extract_fingerprint(
 
     try:
         instrs = decode_instructions(body.code)
-    except Exception:
+    except (ABCParseError, IndexError, ValueError) as exc:
+        log.debug("method_fingerprint: decode failed for body=%d: %s",
+                  body_idx, exc)
         return None
 
     if not instrs:

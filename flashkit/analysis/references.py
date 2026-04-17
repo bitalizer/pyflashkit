@@ -19,9 +19,14 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from collections import defaultdict
 from typing import TYPE_CHECKING
+
+from ..errors import ABCParseError
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..workspace.workspace import Workspace
@@ -215,7 +220,9 @@ class ReferenceIndex:
 
             try:
                 hits = scan_relevant_opcodes(body.code, _REF_SCAN_OPS)
-            except Exception:
+            except (ABCParseError, IndexError, ValueError) as exc:
+                log.debug("references: skip body method=%d: %s",
+                          body.method, exc)
                 continue
 
             for offset, op, operand in hits:
