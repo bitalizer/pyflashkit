@@ -9,7 +9,17 @@ import sys
 from typing import Dict, List, Optional, Set, Tuple
 
 from ..abc.parser import read_u30, read_u8
-from ..abc.opcodes import *
+from ..abc.opcodes import (
+    OP_ASTYPE, OP_CALLPROPERTY, OP_CALLPROPLEX, OP_CALLPROPVOID,
+    OP_CALLSUPER, OP_CALLSUPERVOID, OP_COERCE, OP_CONSTRUCTPROP,
+    OP_DELETEPROPERTY, OP_FINDDEF, OP_FINDPROPERTY, OP_FINDPROPSTRICT,
+    OP_GETDESCENDANTS, OP_GETLEX, OP_GETPROPERTY, OP_GETSUPER,
+    OP_IFEQ, OP_IFFALSE, OP_IFGE, OP_IFGT, OP_IFLE, OP_IFLT,
+    OP_IFNE, OP_IFNGE, OP_IFNGT, OP_IFNLE, OP_IFNLT,
+    OP_IFSTRICTEQ, OP_IFSTRICTNE, OP_IFTRUE,
+    OP_INITPROPERTY, OP_ISTYPE, OP_JUMP, OP_LOOKUPSWITCH,
+    OP_NEWFUNCTION, OP_SETPROPERTY, OP_SETSUPER,
+)
 from ..abc.constants import (
     CONSTANT_QNAME, CONSTANT_QNAME_A,
     CONSTANT_RTQNAME, CONSTANT_RTQNAME_A,
@@ -27,7 +37,13 @@ from ..abc.constants import (
     METHOD_HAS_OPTIONAL, METHOD_HAS_PARAM_NAMES, METHOD_SET_DXNS,
     INSTANCE_SEALED, INSTANCE_FINAL, INSTANCE_INTERFACE, INSTANCE_PROTECTED_NS,
 )
-from ._helpers_full import *
+from .helpers import (
+    INDENT_UNIT,
+    access_modifier as _access_modifier,
+    check_mn_ns_set_typed as _check_mn_ns_set_typed,
+    fmt_hex_const as _fmt_hex_const,
+    skip_operands as _skip_operands,
+)
 from .method import MethodDecompiler
 
 # AVM2 literal-value constant kinds (used for default values on slot/const traits).
@@ -35,8 +51,6 @@ CONSTANT_Int = 0x03
 CONSTANT_UInt = 0x04
 
 log = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
 
 # Derived indent levels (from INDENT_UNIT imported from helpers)
 _I1 = INDENT_UNIT          # 1 level (package body / file-scope class body)
@@ -726,7 +740,7 @@ class AS3Decompiler:
                 pkg = info['package']
                 name = info['name']
                 full_name = f'{pkg}.{name}' if pkg else name
-                logger.info(f'  [{ci + 1}/{total}] {full_name}')
+                log.info("  [%d/%d] %s", ci + 1, total, full_name)
 
                 # Create package directory
                 if pkg:
@@ -740,7 +754,7 @@ class AS3Decompiler:
                     f.write(src)
                 count += 1
             except (IndexError, ValueError, KeyError, AttributeError, IOError, OSError) as e:
-                logger.warning(f'Error decompiling class #{ci}: {e}')
+                log.warning("Error decompiling class #%d: %s", ci, e)
         return count
 
     # ═══════════════════════════════════════════════════════════════════
