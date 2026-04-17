@@ -185,7 +185,11 @@ class ClassGraph:
         Returns:
             A fully populated :class:`ClassGraph`.
         """
-        ref_index = ReferenceIndex.from_workspace(workspace)
+        # Reuse the workspace's already-built ReferenceIndex instead of
+        # re-scanning every method body. Without this, ``workspace.class_graph``
+        # triggered a second full pass over all bytecode — duplicating the
+        # work ``build_all_indexes`` had just done.
+        ref_index = workspace.reference_index
 
         # Map qualified + simple names → simple name for edge resolution.
         all_class_names: set[str] = set()
