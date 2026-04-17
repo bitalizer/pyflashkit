@@ -21,7 +21,7 @@ Quick start::
     output = serialize_abc(abc)
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 from .errors import (
     FlashkitError, ParseError, SWFParseError,
