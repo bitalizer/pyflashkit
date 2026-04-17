@@ -11,7 +11,7 @@ All nodes are dataclasses. Most fields are ``Node`` subclasses; a few
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Union
 
 
 class Node:
@@ -176,9 +176,9 @@ class FunctionExpr(Expression):
     ``params`` is a list of ``(name, type_or_None)`` pairs. ``name`` is
     an optional function name (rarely used in AS3 function
     expressions)."""
-    name: Optional[str]
-    params: list[tuple[str, Optional[str]]]
-    return_type: Optional[str]
+    name: str | None
+    params: list[tuple[str, str | None]]
+    return_type: str | None
     body: "BlockStmt"
 
 
@@ -197,7 +197,7 @@ class IfStmt(Statement):
     another ``IfStmt`` to represent ``else if`` chains."""
     cond: Expression
     then_body: Statement
-    else_body: Optional[Statement] = None
+    else_body: Statement | None = None
 
 
 @dataclass
@@ -216,9 +216,9 @@ class DoWhileStmt(Statement):
 class ForStmt(Statement):
     """``for (init; cond; step) body``. Each header piece may be
     ``None``."""
-    init: Optional[Statement]
-    cond: Optional[Expression]
-    step: Optional[Expression]
+    init: Statement | None
+    cond: Expression | None
+    step: Expression | None
     body: Statement
 
 
@@ -226,7 +226,7 @@ class ForStmt(Statement):
 class ForInStmt(Statement):
     """``for (var var_name[:type] in iterable) body``."""
     var: str
-    var_type: Optional[str]
+    var_type: str | None
     iterable: Expression
     body: Statement
 
@@ -235,7 +235,7 @@ class ForInStmt(Statement):
 class ForEachStmt(Statement):
     """``for each (var var_name[:type] in iterable) body``."""
     var: str
-    var_type: Optional[str]
+    var_type: str | None
     iterable: Expression
     body: Statement
 
@@ -243,7 +243,7 @@ class ForEachStmt(Statement):
 @dataclass
 class SwitchCase(Node):
     """One arm of a switch. ``label=None`` means the default case."""
-    label: Optional[Expression]
+    label: Expression | None
     body: list[Statement] = field(default_factory=list)
 
 
@@ -257,7 +257,7 @@ class SwitchStmt(Statement):
 class CatchClause(Node):
     """A ``catch (var[:type]) { body }`` arm."""
     var: str
-    var_type: Optional[str]
+    var_type: str | None
     body: Statement
 
 
@@ -265,12 +265,12 @@ class CatchClause(Node):
 class TryStmt(Statement):
     try_body: Statement
     catches: list[CatchClause] = field(default_factory=list)
-    finally_body: Optional[Statement] = None
+    finally_body: Statement | None = None
 
 
 @dataclass
 class ReturnStmt(Statement):
-    value: Optional[Expression] = None
+    value: Expression | None = None
 
 
 @dataclass
@@ -280,12 +280,12 @@ class ThrowStmt(Statement):
 
 @dataclass
 class BreakStmt(Statement):
-    label: Optional[str] = None
+    label: str | None = None
 
 
 @dataclass
 class ContinueStmt(Statement):
-    label: Optional[str] = None
+    label: str | None = None
 
 
 @dataclass
@@ -306,5 +306,5 @@ class ExpressionStmt(Statement):
 class VarDeclStmt(Statement):
     """``var name[:type] [= init];``."""
     name: str
-    type_name: Optional[str]
-    init: Optional[Expression]
+    type_name: str | None
+    init: Expression | None

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal as _Lit, Optional
+from typing import Any, Literal as _Lit
 
 from ..abc.opcodes import (
     OP_ADD, OP_ADD_I, OP_ASTYPE, OP_ASTYPELATE,
@@ -110,7 +110,7 @@ class BlockSimResult:
     statements: list[Statement] = field(default_factory=list)
     stack: list[Expression] = field(default_factory=list)
     terminator: TerminatorKind = "fall_through"
-    branch_condition: Optional[Expression] = None
+    branch_condition: Expression | None = None
     switch_targets: list[int] = field(default_factory=list)
 
 

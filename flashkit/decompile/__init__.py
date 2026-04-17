@@ -30,7 +30,7 @@ Usage::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..abc.types import AbcFile
@@ -125,7 +125,7 @@ def _resolve_abc(source) -> tuple:
     return view, AS3Decompiler(view)
 
 
-def _find_class_index(dec, class_index: Optional[int], name: Optional[str]) -> int:
+def _find_class_index(dec, class_index: int | None, name: str | None) -> int:
     if class_index is not None:
         return class_index
     if name is None:
@@ -165,8 +165,8 @@ def list_classes(source) -> list[ClassSummary]:
 
 def decompile_class(
     source,
-    class_index: Optional[int] = None,
-    name: Optional[str] = None,
+    class_index: int | None = None,
+    name: str | None = None,
 ) -> str:
     """Decompile one class to full AS3 source (package + class block).
 
@@ -185,10 +185,10 @@ def decompile_class(
 
 def decompile_method(
     source,
-    class_index: Optional[int] = None,
-    class_name: Optional[str] = None,
-    method_idx: Optional[int] = None,
-    name: Optional[str] = None,
+    class_index: int | None = None,
+    class_name: str | None = None,
+    method_idx: int | None = None,
+    name: str | None = None,
     include_signature: bool = True,
 ) -> str:
     """Decompile a single method.
