@@ -26,7 +26,7 @@ from ..errors import ABCParseError
 from .types import (
     AbcFile, NamespaceInfo, NsSetInfo, MultinameInfo,
     MethodInfo, MetadataInfo, TraitInfo, InstanceInfo,
-    ClassInfo, ScriptInfo, ExceptionInfo, MethodBodyInfo,
+    AbcClassInfo, ScriptInfo, ExceptionInfo, MethodBodyInfo,
 )
 from .constants import (
     CONSTANT_QNAME, CONSTANT_QNAME_A,
@@ -405,7 +405,7 @@ def _parse_abc_inner(data: bytes) -> AbcFile:
         abc.instances.append(inst)
 
     for _ in range(count):
-        ci = ClassInfo(cinit=0)
+        ci = AbcClassInfo(cinit=0)
         ci.cinit, off = read_u30(data, off)
         ci.traits, off = _read_traits(data, off)
         abc.classes.append(ci)

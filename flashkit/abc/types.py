@@ -157,7 +157,7 @@ class TraitInfo:
 class InstanceInfo:
     """An instance (non-static side) of a class definition.
 
-    Each InstanceInfo is paired with a ClassInfo at the same array index.
+    Each InstanceInfo is paired with an AbcClassInfo at the same index.
 
     Attributes:
         name: Multiname index for the class name.
@@ -179,10 +179,13 @@ class InstanceInfo:
 
 
 @dataclass(slots=True)
-class ClassInfo:
-    """The static side of a class definition.
+class AbcClassInfo:
+    """The static side of a class definition at the ABC level.
 
-    Paired with InstanceInfo at the same array index.
+    Paired with :class:`InstanceInfo` at the same array index. The rich,
+    fully-resolved class model lives at :class:`flashkit.info.ClassInfo`.
+    Both existed historically as ``ClassInfo`` in different packages —
+    the ABC one was renamed here for disambiguation.
 
     Attributes:
         cinit: Method index for the static initializer.
@@ -190,6 +193,12 @@ class ClassInfo:
     """
     cinit: int
     traits: list[TraitInfo] = field(default_factory=list)
+
+
+# Backwards-compatible alias. Downstream code that imported the old
+# ``ClassInfo`` from flashkit.abc / flashkit.abc.types keeps working;
+# new code should use the unambiguous name.
+ClassInfo = AbcClassInfo
 
 
 @dataclass(slots=True)
@@ -296,7 +305,7 @@ class AbcFile:
     methods: list[MethodInfo] = field(default_factory=list)
     metadata: list[MetadataInfo] = field(default_factory=list)
     instances: list[InstanceInfo] = field(default_factory=list)
-    classes: list[ClassInfo] = field(default_factory=list)
+    classes: list[AbcClassInfo] = field(default_factory=list)
     scripts: list[ScriptInfo] = field(default_factory=list)
     method_bodies: list[MethodBodyInfo] = field(default_factory=list)
 

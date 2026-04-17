@@ -23,7 +23,8 @@ from .types import (
     MetadataInfo,
     TraitInfo,
     InstanceInfo,
-    ClassInfo,
+    AbcClassInfo,
+    ClassInfo,  # legacy alias for AbcClassInfo
     ScriptInfo,
     ExceptionInfo,
     MethodBodyInfo,
@@ -54,7 +55,8 @@ __all__ = [
     "MetadataInfo",
     "TraitInfo",
     "InstanceInfo",
-    "ClassInfo",
+    "AbcClassInfo",
+    "ClassInfo",  # legacy alias
     "ScriptInfo",
     "ExceptionInfo",
     "MethodBodyInfo",

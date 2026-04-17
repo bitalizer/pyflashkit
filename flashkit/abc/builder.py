@@ -38,7 +38,7 @@ from __future__ import annotations
 from .types import (
     AbcFile, NamespaceInfo, NsSetInfo, MultinameInfo,
     MethodInfo, MetadataInfo, TraitInfo, InstanceInfo,
-    ClassInfo as AbcClassInfo, ScriptInfo, ExceptionInfo, MethodBodyInfo,
+    AbcClassInfo, ScriptInfo, ExceptionInfo, MethodBodyInfo,
 )
 from .parser import write_u30
 from .constants import (
