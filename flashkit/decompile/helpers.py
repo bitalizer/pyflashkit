@@ -1,9 +1,13 @@
-"""
-Decompiler utility helpers — stack manipulation, expression formatting,
-string escaping, bytecode skipping, namespace inspection.
+"""Decompiler utility helpers used by the class-level decompiler and the
+AS3 printer.
 
-These helpers are pure (no decompiler state) and are used by both the
-stack simulator and the class decompiler.
+Scope is narrow: formatting + namespace inspection + bytecode operand
+skipping. No stateful decompilation logic lives here. A larger
+string-manipulation toolkit that fed the pre-CFG pipeline used to live
+in this module but has been removed — the CFG-based decompiler
+(``method.py`` / ``structure.py`` / ``ast/printer.py``) operates on
+typed AST nodes, not strings, and those helpers had no remaining
+callers.
 """
 
 from __future__ import annotations
@@ -51,43 +55,7 @@ INDENT_UNIT = "    "
 """Indent unit used throughout AS3 output. 4 spaces by default."""
 
 
-# ── Stack helpers ───────────────────────────────────────────────────────────
-
-def pop_n(
-    stack: list[str],
-    n: int,
-    error_log: list[str] | None = None,
-    pos: str = "",
-) -> list[str]:
-    """Pop ``n`` items from ``stack`` in argument order (reversed from pop order).
-
-    On stack underflow pushes ``"?"`` placeholders rather than raising, so
-    malformed methods still produce partial output. Logs a message to
-    ``error_log`` if provided.
-    """
-    args: list[str] = []
-    for _ in range(n):
-        if stack:
-            args.append(stack.pop())
-        else:
-            args.append("?")
-            if error_log is not None:
-                msg = f"Stack underflow (expected {n} items)"
-                if pos:
-                    msg = f"{msg} at {pos}"
-                error_log.append(msg)
-    args.reverse()
-    return args
-
-
-# ── Numeric/string formatting ───────────────────────────────────────────────
-
-def fmt_hex(v: int) -> str:
-    """Format ``v`` as ``0xNN`` with byte-aligned (even digit count) padding."""
-    h = f"{v:X}"
-    if len(h) % 2:
-        h = "0" + h
-    return f"0x{h}"
+# ── Numeric / string formatting ─────────────────────────────────────────────
 
 
 def fmt_hex_const(v: int) -> str:
@@ -96,20 +64,6 @@ def fmt_hex_const(v: int) -> str:
     if len(h) < 4:
         h = h.zfill(4)
     return f"0x{h}"
-
-
-def to_hex_if_int(s: str) -> str:
-    """If ``s`` is a non-negative decimal int literal, return its hex form.
-
-    Otherwise returns ``s`` unchanged. Used by bitwise operator formatting.
-    """
-    try:
-        v = int(s)
-        if v >= 0:
-            return fmt_hex(v)
-    except (ValueError, OverflowError):
-        pass
-    return s
 
 
 def escape_str(s: str) -> str:
@@ -147,293 +101,8 @@ def escape_str(s: str) -> str:
     return "".join(out)
 
 
-# ── Expression formatting ───────────────────────────────────────────────────
-
-def fmt_call(obj: str, name: str, args: list[str]) -> str:
-    """Format a method call. Omits the receiver when it's implicit/global."""
-    joined = ", ".join(args)
-    if obj in ("", "global") or obj == name:
-        return f"{name}({joined})"
-    return f"{obj}.{name}({joined})"
-
-
-def binop(stack: list[str], op: str) -> None:
-    """Apply a binary operator in place on ``stack``.
-
-    Wraps the result in parens to avoid precedence ambiguity; the
-    formatter can strip redundant parens at the end.
-    """
-    b = stack.pop() if stack else "?"
-    a = stack.pop() if stack else "?"
-    stack.append(f"({a} {op} {b})")
-
-
-def bitwise_binop(stack: list[str], op: str) -> None:
-    """Like :func:`binop` but formats integer-literal operands as hex."""
-    b = stack.pop() if stack else "?"
-    a = stack.pop() if stack else "?"
-    stack.append(f"({to_hex_if_int(a)} {op} {to_hex_if_int(b)})")
-
-
-# ── Type inference / cast handling ──────────────────────────────────────────
-
-_IMPLICIT_DEFAULTS = {
-    "int": "0",
-    "uint": "0",
-    "Boolean": "false",
-}
-_PRIMITIVE_TYPES = frozenset({"*", "int", "uint", "Number", "Boolean", "String"})
-
-
-def is_type_default(ltype: str, value: str) -> bool:
-    """Return True if ``value`` is the implicit default for type ``ltype``.
-
-    Used to suppress redundant ``var x:int = 0;`` style initializers.
-    """
-    default = _IMPLICIT_DEFAULTS.get(ltype)
-    if default is not None:
-        return value == default
-    if ltype not in _PRIMITIVE_TYPES and value == "null":
-        return True
-    return False
-
-
-def strip_redundant_cast(ltype: str, value: str) -> str:
-    """Strip ``int(...)``/``uint(...)`` when the target is already that type.
-
-    Leaves ``String(...)``, ``Number(...)``, ``Boolean(...)`` alone since
-    those casts often carry explicit semantic intent in AS3.
-    """
-    prefix = {"int": "int(", "uint": "uint("}.get(ltype)
-    if not prefix:
-        return value
-    if not (value.startswith(prefix) and value.endswith(")")):
-        return value
-    inner = value[len(prefix):-1]
-    # Verify the outer parens actually close at the end (not earlier).
-    depth = 0
-    for ch in inner:
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        if depth < 0:
-            return value
-    return inner if depth == 0 else value
-
-
-def add_type_cast_if_needed(
-    ltype: str,
-    value: str,
-    local_types: dict[int, str],
-    local_names: dict[int, str],
-) -> str:
-    """Insert an explicit cast when assigned type clearly mismatches ltype.
-
-    Conservative: only wraps in obvious cases to avoid over-casting.
-
-    - ``String var = <numeric var>`` → ``String(...)``
-    - ``Number var = <string literal or String var>`` → ``Number(...)``
-    - ``Boolean var = <numeric literal>`` → ``Boolean(...)``
-    """
-    v = value.strip()
-
-    def _type_of_named_var() -> str | None:
-        for reg, nm in local_names.items():
-            if v == nm:
-                return local_types.get(reg)
-        return None
-
-    if ltype == "String" and not v.startswith(("String(", '"')):
-        t = _type_of_named_var()
-        if t in ("Number", "int", "uint"):
-            return f"String({value})"
-    elif ltype == "Number" and not v.startswith("Number("):
-        if v.startswith(('"', "'")):
-            return f"Number({value})"
-        if _type_of_named_var() == "String":
-            return f"Number({value})"
-    elif ltype == "Boolean" and not v.startswith("Boolean("):
-        if v.lstrip("-").isdigit() and v not in ("true", "false"):
-            return f"Boolean({value})"
-
-    return value
-
-
-# ── Parenthesis / precedence awareness ──────────────────────────────────────
-
-def has_outer_parens(expr: str) -> bool:
-    """Return True if ``expr`` is wrapped in matching outer parens."""
-    if not (expr.startswith("(") and expr.endswith(")")):
-        return False
-    depth = 0
-    for i, ch in enumerate(expr):
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        if depth == 0 and i < len(expr) - 1:
-            return False  # First '(' closed before end.
-    return True
-
-
-def needs_ternary_wrap(expr: str) -> bool:
-    """Return True if a ternary branch expression needs parens to disambiguate."""
-    if has_outer_parens(expr):
-        return False
-    depth = 0
-    in_str = False
-    for i, ch in enumerate(expr):
-        if ch == '"':
-            in_str = not in_str
-            continue
-        if in_str:
-            continue
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        if depth == 0 and ch == " ":
-            rest = expr[i + 1:]
-            for op in ("+", "-", "*", "/", "%", "&&", "||",
-                       "==", "!=", "===", "!==",
-                       "<", ">", "<=", ">=",
-                       "&", "|", "^", "<<", ">>", ">>>"):
-                if rest.startswith(op + " ") or rest.startswith(op + "("):
-                    return True
-    return False
-
-
-def find_op_outside_parens(expr: str, op: str) -> int:
-    """Find the first occurrence of ``op`` at paren depth 0, not inside a string.
-
-    Returns -1 when not found. Handles multi-char operators correctly:
-    ``==`` is not matched as part of ``===``, ``<`` not part of ``<<`` etc.
-    """
-    depth = 0
-    i = 0
-    oplen = len(op)
-    while i <= len(expr) - oplen:
-        ch = expr[i]
-        if ch == "(":
-            depth += 1
-            i += 1
-            continue
-        if ch == ")":
-            depth -= 1
-            i += 1
-            continue
-        if ch == '"':
-            i += 1
-            while i < len(expr) and expr[i] != '"':
-                if expr[i] == "\\":
-                    i += 1
-                i += 1
-            i += 1
-            continue
-        if ch == "'":
-            i += 1
-            while i < len(expr) and expr[i] != "'":
-                if expr[i] == "\\":
-                    i += 1
-                i += 1
-            i += 1
-            continue
-        if depth == 0 and expr[i:i + oplen] == op:
-            # Reject partial matches of longer operators.
-            if op in ("==", "!=") and i + oplen < len(expr) and expr[i + oplen] == "=":
-                i += 1
-                continue
-            if op in ("<", ">") and i + oplen < len(expr) and expr[i + oplen] in ("=", "<", ">"):
-                i += 1
-                continue
-            if op == "=" and i > 0 and expr[i - 1] in ("!", "<", ">", "="):
-                i += 1
-                continue
-            return i
-        i += 1
-    return -1
-
-
-def wrap_for_logical(expr: str, join_op: str) -> str:
-    """Wrap ``expr`` in parens iff it mixes a different logical operator.
-
-    ``(a == b)`` doesn't need wrapping under ``||`` (== binds tighter).
-    ``(a && b)`` does need wrapping under ``||``.
-    """
-    if has_outer_parens(expr):
-        return expr
-    other_op = "||" if join_op == "&&" else "&&"
-    depth = 0
-    i = 0
-    while i < len(expr) - 1:
-        ch = expr[i]
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        elif ch == '"':
-            i += 1
-            while i < len(expr) and expr[i] != '"':
-                if expr[i] == "\\":
-                    i += 1
-                i += 1
-        elif depth == 0 and expr[i:i + 2] == other_op:
-            return f"({expr})"
-        i += 1
-    return expr
-
-
-# ── Multi-line statement expansion ──────────────────────────────────────────
-
-def expand_multiline_stmt(stmt: str, base_indent: str) -> list[str]:
-    """Split a statement containing object-literal newlines into indented lines.
-
-    Object literals use bare ``\\n`` as separators internally; this function
-    adds the right indent on each line, increasing one level per ``{`` and
-    returning to the outer level on ``}``.
-    """
-    if "\n" not in stmt:
-        return [f"{base_indent}{stmt}"]
-
-    result: list[str] = []
-    leading = len(stmt) - len(stmt.lstrip(" "))
-    actual_indent = len(base_indent) + leading
-    indent_stack = [actual_indent]
-    cur_line = base_indent
-    indent_width = len(INDENT_UNIT)
-
-    i = 0
-    while i < len(stmt):
-        ch = stmt[i]
-        if ch == "\n":
-            result.append(cur_line)
-            # Look ahead: if next non-space is '}', use the outer indent.
-            j = i + 1
-            while j < len(stmt) and stmt[j] == " ":
-                j += 1
-            if j < len(stmt) and stmt[j] == "}":
-                outer = indent_stack[-2] if len(indent_stack) > 1 else indent_stack[-1]
-                cur_line = " " * outer
-            else:
-                cur_line = " " * indent_stack[-1]
-        elif ch == "{":
-            cur_line += ch
-            indent_stack.append(indent_stack[-1] + indent_width)
-        elif ch == "}":
-            if len(indent_stack) > 1:
-                indent_stack.pop()
-            cur_line += ch
-        else:
-            cur_line += ch
-        i += 1
-
-    if cur_line.strip():
-        result.append(cur_line)
-    return result
-
-
 # ── Namespace / access modifier helpers ─────────────────────────────────────
+
 
 def access_modifier(ns_kind: int) -> str:
     """Map an AVM2 namespace kind byte to its AS3 access modifier keyword."""
@@ -444,22 +113,6 @@ def access_modifier(ns_kind: int) -> str:
     if ns_kind == CONSTANT_PACKAGE_INTERNAL_NS:
         return "internal"
     return "public"
-
-
-def typename_param_indices(data: bytes, count: int) -> list[int]:
-    """Decode the packed u30 parameter indices of a TypeName multiname.
-
-    TypeName entries store parameter multiname indices as concatenated u30
-    bytes in ``MultinameInfo.data``. This helper iterates them safely.
-    """
-    params: list[int] = []
-    off = 0
-    for _ in range(count):
-        if off >= len(data):
-            break
-        idx, off = read_u30(data, off)
-        params.append(idx)
-    return params
 
 
 # ── Bytecode operand skipping ───────────────────────────────────────────────
@@ -533,25 +186,6 @@ def skip_operands(op: int, code: bytes, p: int) -> int:
 # follow-up.
 
 
-def check_mn_ns_set(abc, mn_idx: int, result: list) -> None:
-    """If the multiname at ``mn_idx`` uses a namespace set, append each
-    package-namespace to ``result`` (preserving insertion order)."""
-    if mn_idx >= len(abc.multinames):
-        return
-    kind, data = abc.multinames[mn_idx]
-    ns_set_idx = 0
-    if kind in (CONSTANT_MULTINAME, CONSTANT_MULTINAME_A) and data and len(data) >= 2:
-        ns_set_idx = data[1]
-    elif kind in (CONSTANT_MULTINAME_L, CONSTANT_MULTINAME_LA) and data:
-        ns_set_idx = data[0]
-    if ns_set_idx and ns_set_idx < len(abc.ns_sets):
-        for ns_idx in abc.ns_sets[ns_set_idx]:
-            if abc.ns_kind(ns_idx) == CONSTANT_PACKAGE_NAMESPACE:
-                ns = abc.ns_name(ns_idx)
-                if ns and ns not in result:
-                    result.append(ns)
-
-
 def check_typename_param(abc, mn_idx: int, result: list) -> None:
     """Walk a TypeName parameter and add any referenced package to
     ``result``. Handles nested TypeName and QName/Multiname params."""
@@ -578,9 +212,12 @@ def check_typename_param(abc, mn_idx: int, result: list) -> None:
 
 
 def check_mn_ns_set_typed(abc, mn_idx: int, result: list) -> None:
-    """Like :func:`check_mn_ns_set` but only for class-like names —
-    guards against polluting the wildcard list with property and method
-    access multinames whose NS-sets aren't actually type references."""
+    """Append each package-namespace referenced by ``mn_idx`` to
+    ``result``, skipping multinames whose name isn't class-shaped.
+
+    Guards against polluting the wildcard list with property and method
+    access multinames whose NS-sets aren't actually type references.
+    """
     if mn_idx >= len(abc.multinames):
         return
     kind, data = abc.multinames[mn_idx]
