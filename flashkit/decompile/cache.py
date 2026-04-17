@@ -104,7 +104,10 @@ class DecompilerCache:
         raise KeyError(
             f"Method {method_name!r} not found on class {class_name!r}")
 
-    def list_classes(self, swf_path: str | os.PathLike) -> list[dict]:
-        """List classes in the SWF's first ABC block."""
+    def list_classes(self, swf_path: str | os.PathLike) -> list:
+        """List classes in the SWF's first ABC block.
+
+        Returns :class:`~flashkit.decompile.ClassSummary` rows (typed).
+        """
         _, _, dec = self._get_decompiler(swf_path)
         return dec.list_classes()

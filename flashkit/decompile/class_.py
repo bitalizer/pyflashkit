@@ -155,23 +155,32 @@ class AS3Decompiler:
             else:
                 p = _skip_operands(op, code, p)
 
-    def list_classes(self) -> List[dict]:
-        """Return list of class info dicts."""
+    def list_classes(self) -> list:
+        """Return one :class:`~flashkit.decompile.ClassSummary` per class.
+
+        Return type is ``list`` rather than ``list[ClassSummary]`` only
+        to sidestep an import cycle with ``flashkit.decompile.__init__``
+        (which imports from this module). Callers get real
+        ``ClassSummary`` instances — they support both attribute access
+        and legacy dict-style subscript.
+        """
+        from . import ClassSummary
         result = []
         for ci, inst in enumerate(self.abc.instances):
             name = self.abc.mn_name(inst.name_idx)
             pkg = self.abc.mn_ns(inst.name_idx)
             super_name = self.abc.mn_full(inst.super_idx) if inst.super_idx else ''
             is_interface = bool(inst.flags & INSTANCE_INTERFACE)
-            result.append({
-                'index': ci,
-                'name': name,
-                'package': pkg,
-                'full_name': f'{pkg}.{name}' if pkg else name,
-                'super': super_name,
-                'is_interface': is_interface,
-                'trait_count': len(inst.traits) + len(self.abc.classes[ci].traits),
-            })
+            result.append(ClassSummary(
+                index=ci,
+                name=name,
+                package=pkg,
+                full_name=f'{pkg}.{name}' if pkg else name,
+                super=super_name,
+                is_interface=is_interface,
+                trait_count=(len(inst.traits)
+                             + len(self.abc.classes[ci].traits)),
+            ))
         return result
 
     def decompile_class(self, class_idx: int) -> str:

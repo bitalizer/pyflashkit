@@ -43,8 +43,45 @@ __all__ = [
     "decompile_method_body",
     "decompile_class",
     "list_classes",
+    "ClassSummary",
     "DecompilerCache",
 ]
+
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class ClassSummary:
+    """One row of metadata about a class inside a parsed ABC.
+
+    Returned by :func:`list_classes`. Supports dict-style subscript
+    (``c["name"]``) for backwards compatibility with code written
+    before the typed row existed.
+    """
+    index: int
+    name: str
+    package: str
+    full_name: str
+    super: str
+    is_interface: bool
+    trait_count: int
+
+    def __getitem__(self, key: str):
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError(key) from exc
+
+    def get(self, key: str, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def keys(self) -> tuple[str, ...]:
+        return ("index", "name", "package", "full_name",
+                "super", "is_interface", "trait_count")
 
 
 # ── Internal ───────────────────────────────────────────────────────────────
@@ -113,11 +150,14 @@ def _find_class_index(dec, class_index: Optional[int], name: Optional[str]) -> i
 
 # ── Public API ─────────────────────────────────────────────────────────────
 
-def list_classes(source) -> list[dict]:
-    """Return a list of class info dicts for every class in the ABC.
+def list_classes(source) -> list[ClassSummary]:
+    """Return one :class:`ClassSummary` per class in the ABC.
 
-    Each dict contains: ``index``, ``name``, ``package``, ``full_name``,
-    ``super``, ``is_interface``, ``trait_count``.
+    The rows are plain dataclasses — access fields as attributes
+    (``c.name``) or, for backwards compatibility with pre-1.3 code,
+    as dict keys (``c["name"]``). Supported keys match the
+    ``ClassSummary`` field names: ``index``, ``name``, ``package``,
+    ``full_name``, ``super``, ``is_interface``, ``trait_count``.
     """
     _, dec = _resolve_abc(source)
     return dec.list_classes()
