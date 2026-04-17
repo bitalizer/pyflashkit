@@ -82,17 +82,19 @@ class InheritanceGraph:
 
     @classmethod
     def from_workspace(cls, workspace: Workspace) -> InheritanceGraph:
-        """Build an InheritanceGraph from a Workspace's loaded classes.
+        """Return the workspace's cached InheritanceGraph.
 
-        Equivalent to ``InheritanceGraph.from_classes(workspace.classes)``.
+        Kept as a thin accessor for backwards compatibility; the real
+        build happens lazily inside Workspace.
 
         Args:
             workspace: Workspace instance with loaded classes.
 
         Returns:
-            Populated InheritanceGraph.
+            The same InheritanceGraph
+            ``workspace.inheritance`` returns.
         """
-        return cls.from_classes(workspace.classes)
+        return workspace.inheritance
 
     def get_parent(self, name: str) -> str | None:
         """Get the direct superclass of a class.

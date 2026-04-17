@@ -101,23 +101,20 @@ class FieldAccessIndex:
 
     @classmethod
     def from_workspace(cls, workspace: Workspace) -> FieldAccessIndex:
-        """Build a FieldAccessIndex from a Workspace.
+        """Return the workspace's cached FieldAccessIndex.
 
-        Walks all method bodies, decodes instructions, and collects
-        field read/write references.
+        Kept as a thin accessor for backwards compatibility — the real
+        build happens lazily inside Workspace via ``build_all_indexes``
+        so every analysis index shares a single bytecode scan.
 
         Args:
             workspace: A Workspace instance.
 
         Returns:
-            Populated FieldAccessIndex.
+            The same FieldAccessIndex
+            ``workspace.field_access_index`` returns.
         """
-        ws = workspace
-
-        index = cls()
-        for abc in ws.abc_blocks:
-            index._index_abc(abc, ws.classes)
-        return index
+        return workspace.field_access_index
 
     @classmethod
     def from_abc(cls, abc: AbcFile,

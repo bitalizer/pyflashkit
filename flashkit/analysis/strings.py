@@ -89,31 +89,19 @@ class StringIndex:
 
     @classmethod
     def from_workspace(cls, workspace: Workspace) -> StringIndex:
-        """Build a StringIndex from a Workspace.
+        """Return the workspace's cached StringIndex.
 
-        Walks all method bodies, decodes instructions, and collects
-        OP_PUSHSTRING and OP_DEBUGFILE references.
+        Kept as a thin accessor for backwards compatibility — the real
+        build happens lazily inside Workspace via ``build_all_indexes``
+        so every analysis index shares a single bytecode scan.
 
         Args:
             workspace: A Workspace instance.
 
         Returns:
-            Populated StringIndex.
+            The same StringIndex ``workspace.string_index`` returns.
         """
-        ws = workspace
-
-        index = cls()
-
-        # Collect all pool strings
-        for abc in ws.abc_blocks:
-            for s in abc.string_pool:
-                if s:
-                    index.pool_strings.add(s)
-
-        for abc in ws.abc_blocks:
-            index._index_abc(abc, ws.classes)
-
-        return index
+        return workspace.string_index
 
     @classmethod
     def from_abc(cls, abc: AbcFile,

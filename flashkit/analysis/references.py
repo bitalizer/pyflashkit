@@ -40,7 +40,6 @@ from ..abc.opcodes import (
     OP_CALLPROPVOID,
     OP_GETLEX,
     OP_COERCE,
-    OP_NEWCLASS,
 )
 from ..info.member_info import resolve_multiname, build_method_body_map
 
@@ -49,6 +48,10 @@ _REF_SCAN_OPS = frozenset({
     OP_GETLEX, OP_COERCE, OP_PUSHSTRING,
 })
 
+# Kept in sync with ``unified._REF_OPCODES`` / ``unified._REF_KIND``.
+# Circular-import avoidance: unified.py imports ReferenceIndex from
+# here, so we can't pull the tables from unified at module top-level.
+# If a new ref-relevant opcode is added, update both files.
 _REF_KIND_MAP = {
     OP_CONSTRUCTPROP: "instantiation",
     OP_CALLPROPERTY: "call",
@@ -106,32 +109,31 @@ class ReferenceIndex:
 
     @classmethod
     def from_workspace(cls, workspace: Workspace) -> ReferenceIndex:
-        """Build a ReferenceIndex from a Workspace.
+        """Return the workspace's cached ReferenceIndex.
 
-        Scans all class traits and method bodies.
+        Kept as a thin accessor for backwards compatibility — the real
+        build happens lazily inside Workspace via ``build_all_indexes``
+        so every index shares a single bytecode scan. Callers don't
+        pay for an extra pass.
 
         Args:
             workspace: A Workspace instance.
 
         Returns:
-            Populated ReferenceIndex.
+            The same ReferenceIndex ``workspace.reference_index`` returns.
         """
-        ws = workspace
-
-        index = cls()
-
-        for ci in ws.classes:
-            index._index_class_traits(ci)
-
-        for abc in ws.abc_blocks:
-            index._index_method_bodies(abc, ws.classes)
-
-        return index
+        return workspace.reference_index
 
     @classmethod
     def from_classes_and_abc(cls, classes: list[ClassInfo],
                              abc_blocks: list[AbcFile]) -> ReferenceIndex:
-        """Build a ReferenceIndex from class and ABC lists directly.
+        """Build a ReferenceIndex from raw class + ABC lists.
+
+        Only needed when constructing an index outside a Workspace —
+        typically tests or callers that parsed ABC directly without
+        going through the workspace loader. Production code should
+        use ``workspace.reference_index`` (or ``from_workspace``) so
+        the bytecode scan is shared with the other analysis indexes.
 
         Args:
             classes: All resolved ClassInfo objects.
