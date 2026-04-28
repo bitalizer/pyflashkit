@@ -25,9 +25,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bitalizer/flashkit"
-Repository = "https://github.com/bitalizer/flashkit"
-Issues = "https://github.com/bitalizer/flashkit/issues"
+Homepage = "https://github.com/bitalizer/pyflashkit"
+Repository = "https://github.com/bitalizer/pyflashkit"
+Issues = "https://github.com/bitalizer/pyflashkit/issues"
 
 [project.scripts]
 flashkit = "flashkit.cli:main"

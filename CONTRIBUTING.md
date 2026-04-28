@@ -17,6 +17,20 @@ python -m pytest tests/cli/      # just CLI tests
 python -m pytest -k "roundtrip"  # filter by name
 ```
 
+Real-SWF tests are opt-in via `FLASHKIT_TEST_SWF`. They never ship a
+binary fixture in-repo; point the env var at a local file you have
+on disk:
+
+```bash
+FLASHKIT_TEST_SWF=/path/to/your.swf python -m pytest
+```
+
+Coverage:
+
+```bash
+python -m pytest --cov=flashkit --cov-report=term-missing
+```
+
 ## Project layout
 
 ```
@@ -26,8 +40,11 @@ flashkit/
   abc/           AVM2 bytecode parsing, writing, disassembly, builder
   info/          Resolved class/field/method model
   workspace/     File loading, resource management
-  analysis/      Inheritance, call graph, references, strings
-  search/        Unified query engine
+  analysis/      Inheritance, call graph, references, strings,
+                 field access, method fingerprints, class graph,
+                 liveness, const-args, dead code, complexity
+  decompile/     CFG-based AS3 decompiler (method + class)
+  graph/         CFG, dominators, loop detection (used by decompiler)
   errors.py      Error hierarchy
 
 tests/
@@ -36,7 +53,8 @@ tests/
   info/          ClassInfo resolution tests
   workspace/     Workspace loading tests
   analysis/      Analysis module tests
-  search/        Search engine tests
+  decompile/     Decompiler structuring + cache tests
+  graph/         CFG / dominators / loops tests
   cli/           CLI integration tests
   conftest.py    Shared fixtures (build_abc_bytes, build_swf_bytes)
 ```
