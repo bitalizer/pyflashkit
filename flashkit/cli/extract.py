@@ -9,8 +9,17 @@ from ._util import load
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser("extract", help="Extract ABC blocks from SWF")
-    p.add_argument("file", help="SWF file")
+    p = sub.add_parser(
+        "extract",
+        help="Extract ABC blocks from SWF",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit extract game.swf\n"
+            "  flashkit extract game.swf -o ./abc_dump"
+        ),
+    )
+    p.add_argument("file", help="SWF or SWZ file")
     p.add_argument("-o", "--output", help="Output directory")
     p.set_defaults(func=run)
 

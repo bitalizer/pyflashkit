@@ -9,7 +9,7 @@ from ._util import load, bold
 
 def register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("tags", help="List SWF tags")
-    p.add_argument("file", help="SWF file")
+    p.add_argument("file", help="SWF or SWZ file")
     p.set_defaults(func=run)
 
 

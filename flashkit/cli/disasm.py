@@ -8,11 +8,21 @@ from ._util import load, bold
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser("disasm", help="Disassemble method bytecode")
+    p = sub.add_parser(
+        "disasm",
+        help="Disassemble method bytecode",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit disasm game.swf --class PlayerManager\n"
+            "  flashkit disasm game.swf --method-index 42\n"
+            "  flashkit disasm game.swf --class Foo --raw"
+        ),
+    )
     p.add_argument("file", help="SWF or SWZ file")
-    p.add_argument("--class", dest="class_name",
+    p.add_argument("--class", dest="class_name", metavar="CLASS",
                    help="Class to disassemble")
-    p.add_argument("--method-index", type=int,
+    p.add_argument("--method-index", type=int, metavar="N",
                    help="Method index to disassemble")
     p.add_argument("--raw", action="store_true",
                    help="Show raw pool indices instead of resolved names")

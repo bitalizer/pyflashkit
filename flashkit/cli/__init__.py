@@ -20,6 +20,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flashkit",
         description="SWF/ABC toolkit — inspect, analyze, and manipulate Flash files.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Run ``flashkit COMMAND --help`` for examples and per-command flags.\n"
+            "Common starting points:\n"
+            "  flashkit info game.swf\n"
+            "  flashkit decompile game.swf --class Player\n"
+            "  flashkit classes game.swf -s Manager\n"
+            "  flashkit pool game.swf multinames -s level"
+        ),
     )
     parser.add_argument(
         "--version", action="version",

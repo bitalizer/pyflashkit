@@ -15,6 +15,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "pool",
         help="Dump an ABC constant pool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit pool game.swf multinames\n"
+            "  flashkit pool game.swf multinames -s level\n"
+            "  flashkit pool game.swf namespaces -s flash\n"
+            "  flashkit pool game.swf ints"
+        ),
     )
     p.add_argument("file", help="SWF or SWZ file")
     p.add_argument(

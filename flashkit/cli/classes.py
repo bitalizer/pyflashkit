@@ -8,7 +8,19 @@ from ._util import load, bold, dim, cyan, green
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser("classes", help="List classes")
+    p = sub.add_parser(
+        "classes",
+        help="List classes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit classes game.swf\n"
+            "  flashkit classes game.swf -s Manager\n"
+            "  flashkit classes game.swf -p com.game\n"
+            "  flashkit classes game.swf -e Sprite\n"
+            "  flashkit classes game.swf -i"
+        ),
+    )
     p.add_argument("file", help="SWF or SWZ file")
     p.add_argument("-s", "--search", help="Filter by name substring")
     p.add_argument("-p", "--package", help="Filter by package")

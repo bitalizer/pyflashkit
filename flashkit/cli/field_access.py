@@ -9,11 +9,22 @@ from ._util import load, bold, dim, cyan
 
 def register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
-        "fields", help="Show field read/write access patterns for a class")
+        "fields",
+        help="Show field read/write access patterns for a class",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit fields game.swf PlayerManager\n"
+            "  flashkit fields game.swf PlayerManager -f mHealth\n"
+            "  flashkit fields game.swf PlayerManager -m takeDamage\n"
+            "  flashkit fields game.swf PlayerManager -c"
+        ),
+    )
     p.add_argument("file", help="SWF or SWZ file")
     p.add_argument("name", help="Class name")
-    p.add_argument("--field", "-f", help="Show access for a specific field")
-    p.add_argument("--method", "-m",
+    p.add_argument("--field", "-f", metavar="NAME",
+                   help="Show access for a specific field")
+    p.add_argument("--method", "-m", metavar="NAME",
                    help="Show fields accessed by a specific method")
     p.add_argument("--constructor", "-c", action="store_true",
                    help="Show constructor field assignments")

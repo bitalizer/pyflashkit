@@ -11,18 +11,26 @@ def register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "decompile",
         help="Decompile AVM2 bytecode to AS3 source",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  flashkit decompile game.swf --list\n"
+            "  flashkit decompile game.swf --class PlayerManager\n"
+            "  flashkit decompile game.swf --class PlayerManager --method update\n"
+            "  flashkit decompile game.swf --all --outdir ./decompiled"
+        ),
     )
     p.add_argument("file", help="SWF or SWZ file")
     p.add_argument("--list", action="store_true",
                    help="List all classes instead of decompiling")
-    p.add_argument("--class", dest="class_name",
+    p.add_argument("--class", dest="class_name", metavar="CLASS",
                    help="Class name (short or fully-qualified) to decompile")
-    p.add_argument("--method", dest="method_name",
+    p.add_argument("--method", dest="method_name", metavar="METHOD",
                    help="Method name inside --class to decompile "
                         "(requires --class)")
     p.add_argument("--all", action="store_true",
                    help="Decompile every class to --outdir")
-    p.add_argument("--outdir", default="decompiled",
+    p.add_argument("--outdir", default="decompiled", metavar="DIR",
                    help="Output directory for --all (default: decompiled/)")
     p.set_defaults(func=run)
 
